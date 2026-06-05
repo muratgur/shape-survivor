@@ -15,8 +15,9 @@ const HudScene = preload("res://scripts/ui/hud.gd")
 const UpgradeDraftScene = preload("res://scripts/ui/upgrade_draft.gd")
 const ResultScreenScene = preload("res://scripts/ui/result_screen.gd")
 const PauseOverlayScene = preload("res://scripts/ui/pause_overlay.gd")
+const ShopScene = preload("res://scripts/ui/shop.gd")
 
-enum GameState { SELECT, COMBAT, DRAFT, RESULT, PAUSED }
+enum GameState { SELECT, COMBAT, DRAFT, RESULT, PAUSED, SHOP }
 
 var rng = RandomNumberGenerator.new()
 var camera: Camera2D
@@ -30,6 +31,7 @@ var hud
 var upgrade_draft
 var result_screen
 var pause_overlay
+var shop
 
 var game_state = GameState.SELECT
 var previous_state = GameState.SELECT
@@ -50,6 +52,7 @@ var effects = []
 
 var ink_this_wave = 0
 var ink_total = 0
+var ink_bank = 0
 var score = 0
 var enemies_popped = 0
 var upgrades_chosen = 0
@@ -162,6 +165,13 @@ func _create_scene_graph() -> void:
 	pause_overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
 	ui_layer.add_child(pause_overlay)
 
+	shop = ShopScene.new()
+	shop.name = "Shop"
+	shop.set_anchors_preset(Control.PRESET_FULL_RECT)
+	shop.item_purchased.connect(_on_shop_item_purchased)
+	shop.shop_closed.connect(_on_shop_closed)
+	ui_layer.add_child(shop)
+
 
 func _update_camera_zoom() -> void:
 	if not is_instance_valid(camera):
@@ -211,6 +221,7 @@ func _show_character_select() -> void:
 	previous_state = GameState.SELECT
 	result_screen.hide_result()
 	upgrade_draft.hide_draft()
+	shop.hide_shop()
 	pause_overlay.visible = false
 	hud.visible = false
 	player.visible = false
@@ -225,6 +236,7 @@ func _start_run(character_id: String = "") -> void:
 		selected_character_id = character_id
 	result_screen.hide_result()
 	upgrade_draft.hide_draft()
+	shop.hide_shop()
 	character_select.hide_select()
 	pause_overlay.visible = false
 	hud.visible = true
@@ -240,6 +252,7 @@ func _start_run(character_id: String = "") -> void:
 	pending_volunteer_shots.clear()
 	ink_this_wave = 0
 	ink_total = 0
+	ink_bank = 0
 	score = 0
 	enemies_popped = 0
 	upgrades_chosen = 0
@@ -371,6 +384,7 @@ func _update_pickups(delta: float) -> void:
 			else:
 				ink_this_wave += pickup.value
 				ink_total += pickup.value
+				ink_bank += pickup.value
 				_spawn_attack_effect("ink_collect", 0.12, {"position": collect_position, "target": player.position})
 			pickups.erase(pickup)
 			pickup.queue_free()
@@ -763,6 +777,15 @@ func _remove_projectile(projectile) -> void:
 func _complete_regular_wave() -> void:
 	waves_cleared = max(waves_cleared, current_wave_index + 1)
 	_clear_enemies_without_rewards()
+	if bool(waves[current_wave_index].get("has_shop", false)):
+		game_state = GameState.SHOP
+		shop.show_shop(ink_bank, _build_shop_offers(), current_wave_index + 1, min(current_wave_index + 2, waves.size()))
+		_update_hud("SHOP")
+		return
+	_begin_post_wave_draft()
+
+
+func _begin_post_wave_draft() -> void:
 	if not bool(waves[current_wave_index].get("draft_after", true)):
 		_start_wave(min(current_wave_index + 1, waves.size() - 1))
 		return
@@ -773,6 +796,52 @@ func _complete_regular_wave() -> void:
 	game_state = GameState.DRAFT
 	upgrade_draft.show_choices(choices, next_wave_number, small_power)
 	_update_hud("CHOOSE")
+
+
+func _on_shop_item_purchased(item: Dictionary) -> void:
+	var price = int(item.get("price", 0))
+	if ink_bank < price:
+		return
+	ink_bank = max(0, ink_bank - price)
+	upgrades_chosen += 1
+	_apply_upgrade(item)
+	_refresh_player_damage_multiplier()
+	_refresh_weapon_visuals()
+	shop.set_balance(ink_bank)
+
+
+func _on_shop_closed() -> void:
+	shop.hide_shop()
+	_begin_post_wave_draft()
+
+
+func _build_shop_offers() -> Array:
+	var pool = _shop_pool()
+	pool.shuffle()
+	return pool.slice(0, min(3, pool.size()))
+
+
+func _shop_pool() -> Array:
+	return [
+		{"id": "corner_cannon",      "name": "CORNER CANNON",      "line": "Squares leave in four directions.",   "price": 22, "icon": "square"},
+		{"id": "dot_swarm",          "name": "DOT SWARM",          "line": "Dots orbit, then abandon you.",       "price": 22, "icon": "dot"},
+		{"id": "rude_triangle",      "name": "RUDE TRIANGLE",      "line": "A wedge interrupts someone.",         "price": 20, "icon": "triangle"},
+		{"id": "orbit_ruler",        "name": "ORBIT RULER",        "line": "A rectangle sweeps the room.",        "price": 26, "icon": "ruler"},
+		{"id": "volunteer_dot_plus", "name": "VOLUNTEER DOT+",     "line": "The anxious dot practices bonking.",  "price": 14, "icon": "volunteer_dot"},
+		{"id": "meaner_corners",     "name": "MEANER CORNERS",     "line": "Your outline gets judgmental.",       "price": 16, "icon": "triangle"},
+		{"id": "bigger_scribble",    "name": "BIGGER SCRIBBLE",    "line": "Weapons draw wider trouble.",         "price": 12, "icon": "blob"},
+		{"id": "faster_panic",       "name": "FASTER PANIC",       "line": "Everything fires less politely.",     "price": 14, "icon": "pinwheel"},
+		{"id": "blunt_corner",       "name": "BLUNT CORNER",       "line": "Hits without finesse. Still counts.", "price": 10, "icon": "triangle"},
+		{"id": "comfy_blob",         "name": "COMFY BLOB",         "line": "A spare lobe appears.",               "price": 16, "icon": "heart"},
+		{"id": "helpful_blob",       "name": "HELPFUL BLOB",       "line": "Heals one. That's it.",               "price": 8,  "icon": "heart"},
+		{"id": "rough_draft_hp",     "name": "ROUGH DRAFT HP",     "line": "More room on the line.",              "price": 10, "icon": "blob"},
+		{"id": "scoot_marks",        "name": "SCOOT MARKS",        "line": "The blob leaves nervous dashes.",     "price": 12, "icon": "blob"},
+		{"id": "anxious_zigzag",     "name": "ANXIOUS ZIGZAG",     "line": "Faster when things get crowded.",     "price": 14, "icon": "blob"},
+		{"id": "pocket_magnet",      "name": "POCKET MAGNET",      "line": "Ink drops get clingy.",               "price": 16, "icon": "orb"},
+		{"id": "side_hustle",        "name": "SIDE HUSTLE",        "line": "More sides, more opinions.",          "price": 18, "icon": "blob"},
+		{"id": "corner_applause",    "name": "CORNER APPLAUSE",    "line": "Sharp hits get cheers.",              "price": 18, "icon": "square"},
+		{"id": "apology_orb",        "name": "APOLOGY ORB",        "line": "A soft pulse says move.",             "price": 24, "icon": "orb"}
+	]
 
 
 func _clear_enemies_without_rewards() -> void:
@@ -792,6 +861,7 @@ func _finish_run(won: bool) -> void:
 	game_state = GameState.RESULT
 	hud.visible = false
 	upgrade_draft.hide_draft()
+	shop.hide_shop()
 	pause_overlay.visible = false
 	if won:
 		waves_cleared = waves.size()
@@ -898,6 +968,16 @@ func _apply_upgrade(choice: Dictionary) -> void:
 		"very_serious_rectangle":
 			player.knockback_multiplier *= 1.0 + 0.18 * scale
 			player.add_visual_tag("rectangle_badge")
+		"blunt_corner":
+			base_damage_multiplier += 0.08
+			player.add_visual_tag("corner_nubs", 1)
+		"helpful_blob":
+			player.heal(1)
+		"rough_draft_hp":
+			player.max_hp += 2
+		"anxious_zigzag":
+			player.move_speed *= 1.08
+			player.add_visual_tag("orbit_ticks")
 
 
 func _upgrade_weapon(weapon_id: String) -> void:
@@ -1051,6 +1131,7 @@ func _build_wave_data() -> void:
 			"duration": 45.0,
 			"spawn_rate": 1.20,
 			"threshold": 18,
+			"has_shop": true,
 			"mix": ["wobble_circle", "wobble_circle", "smug_square"]
 		},
 		{
@@ -1058,6 +1139,7 @@ func _build_wave_data() -> void:
 			"duration": 60.0,
 			"spawn_rate": 0.80,
 			"threshold": 30,
+			"has_shop": true,
 			"mix": ["wobble_circle", "smug_square", "pointy_triangle", "pointy_triangle"]
 		},
 		{
@@ -1065,6 +1147,7 @@ func _build_wave_data() -> void:
 			"duration": 75.0,
 			"spawn_rate": 0.55,
 			"threshold": 42,
+			"has_shop": true,
 			"mix": ["wobble_circle", "smug_square", "pointy_triangle", "needle_line", "needle_line", "dizzy_spiral"]
 		},
 		{
@@ -1073,6 +1156,7 @@ func _build_wave_data() -> void:
 			"spawn_rate": 0.60,
 			"threshold": 48,
 			"drop_rate": 1.5,
+			"has_shop": true,
 			"mix": ["wobble_circle", "needle_line", "needle_line", "dizzy_spiral", "dizzy_spiral", "pointy_triangle"]
 		},
 		{
@@ -1081,6 +1165,7 @@ func _build_wave_data() -> void:
 			"spawn_rate": 1.25,
 			"threshold": 0,
 			"draft_after": false,
+			"has_shop": true,
 			"spawn_pattern": "pulse",
 			"pulse_windows": [[0.0, 8.0], [12.0, 20.0], [25.0, 31.0]],
 			"mix": ["wobble_circle", "wobble_circle", "smug_square", "smug_square", "pointy_triangle", "needle_line"]
