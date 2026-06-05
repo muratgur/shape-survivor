@@ -4,7 +4,18 @@ A tiny, hand-doodled survivors-like built in Godot 4.6 with **zero asset files**
 
 Pick a nervous doodle, survive eight increasingly mean waves, and draft upgrades between rounds until you either pop the boss or get popped yourself.
 
-![gameplay](docs/screenshots/gameplay.png)
+![sketchbook](docs/screenshots/sketchbook.gif)
+
+## Gallery
+
+|  |  |
+| --- | --- |
+| ![character select](docs/screenshots/character_select.png) | ![gameplay](docs/screenshots/gameplay.png) |
+| *Pick your doodle and difficulty* | *Survive the swarm* |
+| ![upgrade draft](docs/screenshots/upgrade_draft.png) | ![shop](docs/screenshots/shop.png) |
+| *Draft an upgrade between waves* | *Spend ink at the shop* |
+| ![codex](docs/screenshots/codex.png) |  |
+| *Codex: characters, enemies, weapons, upgrades* |  |
 
 ## Highlights
 
