@@ -24,12 +24,12 @@ static func _entry(name: String, icon: String, observation: String, truth: Strin
 
 static func _actors() -> Array:
 	return [
-		_entry("BALANCED BLOB", "actor_balanced_blob", "It adapts without drama.", "Standard health, speed, and body size. No special demands.", "5 HP. 260 speed. 18 radius.", "It was here first."),
-		_entry("QUICK DOT", "actor_quick_dot", "Tiny runaway mark.", "Moves faster than the others and has less room for mistakes.", "4 HP. 285 speed. 16 radius.", "A dot with plans."),
-		_entry("STURDY SQUARE", "actor_sturdy_square", "Serious little block.", "Has more health and a larger body. Moves slowly.", "6 HP. 235 speed. 20 radius.", "It believes in corners."),
-		_entry("FANCY HEX", "actor_fancy_hex", "Six sides. Somehow smug.", "Starts with extra sides, which can matter for side-based damage.", "5 HP. 250 speed. 6 sides.", "More angles than necessary."),
-		_entry("TIMID TRIANGLE", "actor_timid_triangle", "Technically a threat.", "Hits harder and moves quickly, but has very little health.", "3 HP. 300 speed. More damage.", "It points away from responsibility."),
-		_entry("GRUMPY WEDGE", "actor_grumpy_wedge", "Done with this.", "Hits harder than most and moves at a careful pace.", "4 HP. 245 speed. More damage.", "It has chosen a direction.")
+		_entry("BALANCED BLOB", "actor_balanced_blob", "It adapts without drama.", "Standard health, speed, and body size. Starts with Volunteer Dot.", "5 HP. 260 speed. 18 radius. See VOLUNTEER DOT.", "It was here first."),
+		_entry("QUICK DOT", "actor_quick_dot", "Tiny runaway mark.", "Moves faster than the others and has less room for mistakes. Starts with Panic Pinwheel.", "4 HP. 285 speed. 16 radius. See PANIC PINWHEEL.", "A dot with plans."),
+		_entry("STURDY SQUARE", "actor_sturdy_square", "Serious little block.", "Has more health and a larger body. Moves slowly. Starts with Corner Cannon.", "6 HP. 235 speed. 20 radius. See CORNER CANNON.", "It believes in corners."),
+		_entry("FANCY HEX", "actor_fancy_hex", "Six sides. Somehow smug.", "Starts with extra sides and Dot Swarm, making the page busier early.", "5 HP. 250 speed. 6 sides. See DOT SWARM.", "More angles than necessary."),
+		_entry("TIMID TRIANGLE", "actor_timid_triangle", "Technically a threat.", "Hits harder and moves quickly, but has very little health. Starts with Rude Triangle.", "3 HP. 300 speed. More damage. See RUDE TRIANGLE.", "It points away from responsibility."),
+		_entry("GRUMPY WEDGE", "actor_grumpy_wedge", "Done with this.", "Hits harder than most and moves at a careful pace. Starts with Apology Orb.", "4 HP. 245 speed. More damage. See APOLOGY ORB.", "It has chosen a direction.")
 	]
 
 

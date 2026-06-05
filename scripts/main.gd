@@ -271,7 +271,7 @@ func _start_run(character_id: String = "") -> void:
 	base_damage_multiplier = 1.0
 	side_bonus_per_extra_side = 0.0
 	weapons = {
-		"volunteer_dot": {"level": 1, "timer": 0.30}
+		_starter_weapon_id_for_character(_character_by_id(selected_character_id)): {"level": 1, "timer": 0.30}
 	}
 	active_sweeps.clear()
 	pending_volunteer_shots.clear()
@@ -1249,7 +1249,7 @@ func _upgrade_by_id(id: String) -> Dictionary:
 
 
 func _is_weapon_id(id: String) -> bool:
-	return id in ["volunteer_dot", "corner_cannon", "dot_swarm", "rude_triangle", "orbit_ruler", "apology_orb", "panic_pinwheel"]
+	return _is_starter_weapon_id(id)
 
 
 func _nearest_enemy(max_distance: float = 999999.0):
@@ -1388,6 +1388,7 @@ func _build_character_roster() -> void:
 		{
 			"id": "balanced_blob",
 			"name": "BALANCED BLOB",
+			"starter_weapon_id": "volunteer_dot",
 			"line": "Default scrappy doodle. Adapts without drama.",
 			"stat_line": "5 HP / 260 speed / 18 radius",
 			"max_hp": 5,
@@ -1398,6 +1399,7 @@ func _build_character_roster() -> void:
 		{
 			"id": "quick_dot",
 			"name": "QUICK DOT",
+			"starter_weapon_id": "panic_pinwheel",
 			"line": "Tiny runaway mark. Faster, but less forgiving.",
 			"stat_line": "4 HP / 285 speed / 16 radius",
 			"max_hp": 4,
@@ -1408,6 +1410,7 @@ func _build_character_roster() -> void:
 		{
 			"id": "sturdy_square",
 			"name": "STURDY SQUARE",
+			"starter_weapon_id": "corner_cannon",
 			"line": "Serious little block. Safer, slower, easier to tag.",
 			"stat_line": "6 HP / 235 speed / 20 radius",
 			"max_hp": 6,
@@ -1418,6 +1421,7 @@ func _build_character_roster() -> void:
 		{
 			"id": "fancy_hex",
 			"name": "FANCY HEX",
+			"starter_weapon_id": "dot_swarm",
 			"line": "Six sides. Somehow smug about it.",
 			"stat_line": "5 HP / 250 speed / 6 sides",
 			"max_hp": 5,
@@ -1429,6 +1433,7 @@ func _build_character_roster() -> void:
 		{
 			"id": "timid_triangle",
 			"name": "TIMID TRIANGLE",
+			"starter_weapon_id": "rude_triangle",
 			"line": "Technically a threat. Emotionally, less certain.",
 			"stat_line": "DMG +20% / 3 HP / 300 speed",
 			"max_hp": 3,
@@ -1440,6 +1445,7 @@ func _build_character_roster() -> void:
 		{
 			"id": "grumpy_wedge",
 			"name": "GRUMPY WEDGE",
+			"starter_weapon_id": "apology_orb",
 			"line": "Done with this. Ready when you are.",
 			"stat_line": "DMG +25% / 4 HP / 245 speed",
 			"max_hp": 4,
@@ -1456,6 +1462,17 @@ func _character_by_id(character_id: String) -> Dictionary:
 		if str(character.get("id", "")) == character_id:
 			return character
 	return character_roster[0] if not character_roster.is_empty() else {}
+
+
+func _starter_weapon_id_for_character(character: Dictionary) -> String:
+	var starter_id = str(character.get("starter_weapon_id", "volunteer_dot"))
+	if _is_starter_weapon_id(starter_id):
+		return starter_id
+	return "volunteer_dot"
+
+
+func _is_starter_weapon_id(id: String) -> bool:
+	return id in ["volunteer_dot", "corner_cannon", "dot_swarm", "rude_triangle", "orbit_ruler", "apology_orb", "panic_pinwheel"]
 
 
 func _build_upgrade_pool() -> void:

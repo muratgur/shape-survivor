@@ -104,11 +104,14 @@ func _draw_card(index: int, rect: Rect2, character: Dictionary, font: Font) -> v
 	var name = str(character.get("name", "UNKNOWN"))
 	var line = str(character.get("line", ""))
 	var stats = str(character.get("stat_line", ""))
+	var starter_id = _safe_starter_id(str(character.get("starter_weapon_id", "volunteer_dot")))
 	draw_string(font, card_rect.position + Vector2(14.0, 172.0), name, HORIZONTAL_ALIGNMENT_CENTER, card_rect.size.x - 28.0, 22, INK)
 	draw_string(font, card_rect.position + Vector2(18.0, 207.0), line, HORIZONTAL_ALIGNMENT_CENTER, card_rect.size.x - 36.0, 15, Color(0.07, 0.06, 0.05, 0.86))
-	draw_string(font, card_rect.position + Vector2(16.0, 250.0), stats, HORIZONTAL_ALIGNMENT_CENTER, card_rect.size.x - 32.0, 16, INK)
+	draw_string(font, card_rect.position + Vector2(16.0, 242.0), stats, HORIZONTAL_ALIGNMENT_CENTER, card_rect.size.x - 32.0, 16, INK)
+	_draw_starter_icon(starter_id, card_rect.position + Vector2(38.0, card_rect.size.y - 47.0), selected)
+	draw_string(font, card_rect.position + Vector2(62.0, card_rect.size.y - 39.0), "START: " + _starter_name(starter_id), HORIZONTAL_ALIGNMENT_LEFT, card_rect.size.x - 78.0, 13, Color(0.07, 0.06, 0.05, 0.72))
 	if selected:
-		draw_string(font, card_rect.position + Vector2(16.0, card_rect.size.y - 24.0), "ENTER / CLICK", HORIZONTAL_ALIGNMENT_CENTER, card_rect.size.x - 32.0, 13, Color(0.07, 0.06, 0.05, 0.64))
+		draw_string(font, card_rect.position + Vector2(16.0, card_rect.size.y - 14.0), "ENTER / CLICK", HORIZONTAL_ALIGNMENT_CENTER, card_rect.size.x - 32.0, 12, Color(0.07, 0.06, 0.05, 0.58))
 
 
 func _draw_character_icon(character_id: String, center: Vector2, color: Color, selected: bool) -> void:
@@ -217,6 +220,63 @@ func _draw_codex_button(font: Font) -> void:
 func _codex_button_rect() -> Rect2:
 	var viewport_size = get_viewport_rect().size
 	return Rect2(Vector2(viewport_size.x - 152.0, 28.0), Vector2(116.0, 34.0))
+
+
+func _safe_starter_id(starter_id: String) -> String:
+	if starter_id in ["volunteer_dot", "panic_pinwheel", "corner_cannon", "dot_swarm", "rude_triangle", "orbit_ruler", "apology_orb"]:
+		return starter_id
+	return "volunteer_dot"
+
+
+func _starter_name(starter_id: String) -> String:
+	match starter_id:
+		"panic_pinwheel":
+			return "PANIC PINWHEEL"
+		"corner_cannon":
+			return "CORNER CANNON"
+		"dot_swarm":
+			return "DOT SWARM"
+		"rude_triangle":
+			return "RUDE TRIANGLE"
+		"orbit_ruler":
+			return "ORBIT RULER"
+		"apology_orb":
+			return "APOLOGY ORB"
+	return "VOLUNTEER DOT"
+
+
+func _draw_starter_icon(starter_id: String, center: Vector2, selected: bool) -> void:
+	var wobble = sin(_pulse * 4.0) * (0.08 if selected else 0.03)
+	match starter_id:
+		"panic_pinwheel":
+			for i in range(4):
+				draw_set_transform(center, wobble + TAU * float(i) / 4.0, Vector2.ONE)
+				draw_rect(Rect2(Vector2(0.0, -2.4), Vector2(18.0, 4.8)), INK)
+			draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+		"corner_cannon":
+			draw_rect(Rect2(center - Vector2(10.0, 10.0), Vector2(20.0, 20.0)), INK)
+			draw_rect(Rect2(center - Vector2(6.5, 6.5), Vector2(13.0, 13.0)), Color(0.25, 0.52, 0.91))
+		"dot_swarm":
+			for i in range(4):
+				var p = center + Vector2.RIGHT.rotated(wobble + TAU * float(i) / 4.0) * 11.0
+				draw_circle(p, 4.0, INK)
+				draw_circle(p, 2.3, Color(0.97, 0.89, 0.24))
+		"rude_triangle":
+			var points = PackedVector2Array([center + Vector2(0.0, -13.0), center + Vector2(12.0, 10.0), center + Vector2(-12.0, 10.0)])
+			draw_colored_polygon(points, INK)
+			draw_colored_polygon(PackedVector2Array([center + Vector2(0.0, -8.5), center + Vector2(7.5, 6.5), center + Vector2(-7.5, 6.5)]), Color(0.93, 0.21, 0.16))
+		"orbit_ruler":
+			draw_set_transform(center, 0.22 + wobble, Vector2.ONE)
+			draw_rect(Rect2(Vector2(-16.0, -3.5), Vector2(32.0, 7.0)), INK)
+			draw_rect(Rect2(Vector2(-13.0, -1.5), Vector2(26.0, 3.0)), Color(0.66, 0.91, 0.62))
+			draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+		"apology_orb":
+			draw_arc(center, 12.0, 0.0, TAU, 28, INK, 2.5, true)
+			draw_arc(center, 7.0, 0.0, TAU, 24, Color(0.45, 0.70, 1.0), 2.0, true)
+		_:
+			draw_circle(center, 10.0, INK)
+			draw_circle(center, 6.5, Color(0.98, 0.89, 0.24))
+			draw_circle(center + Vector2(2.5, -3.0), 1.3, PAPER)
 
 
 func _closed_points(points: PackedVector2Array) -> PackedVector2Array:

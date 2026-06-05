@@ -1,1 +1,7 @@
 res://scripts/main.gd
+res://scripts/entities/effect.gd
+res://scripts/entities/pickup.gd
+res://scripts/ui/character_select.gd
+res://scripts/ui/pause_overlay.gd
+res://scripts/ui/codex_overlay.gd
+res://scripts/ui/codex_registry.gd
