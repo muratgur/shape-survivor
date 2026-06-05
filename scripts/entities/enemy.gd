@@ -30,10 +30,11 @@ var _spiral_burst_radius = 82.0
 var _spiral_spin = 0.0
 
 
-func setup(enemy_kind: String, start_position: Vector2, target_position: Vector2, world_size: Vector2) -> void:
+func setup(enemy_kind: String, start_position: Vector2, target_position: Vector2, world_size: Vector2, difficulty_profile: Dictionary = {}) -> void:
 	kind = enemy_kind
 	position = start_position
 	arena_size = world_size
+	contact_damage = 1
 	_wobble_seed = randf_range(0.0, TAU)
 	_charge_dir = (target_position - start_position).normalized()
 	if _charge_dir == Vector2.ZERO:
@@ -89,6 +90,8 @@ func setup(enemy_kind: String, start_position: Vector2, target_position: Vector2
 			speed = 120.0
 			color = Color(0.95, 0.82, 0.20)
 			score_value = 10
+	hp *= float(difficulty_profile.get("hp_mult", 1.0))
+	contact_damage = max(1, int(ceil(float(contact_damage) * float(difficulty_profile.get("dmg_mult", 1.0)))))
 	max_hp = hp
 	queue_redraw()
 

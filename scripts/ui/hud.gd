@@ -2,6 +2,7 @@ extends Control
 
 const INK = Color(0.07, 0.06, 0.05)
 const PAPER_LINE = Color(0.48, 0.42, 0.34, 0.38)
+const ORANGE = Color(0.87, 0.48, 0.23)
 
 var hp = 5
 var max_hp = 5
@@ -12,6 +13,8 @@ var ink_threshold = 18
 var score = 0
 var state_note = ""
 var shield_charges = 0
+var difficulty_label = "EASY"
+var difficulty_id = "easy"
 
 
 func _ready() -> void:
@@ -28,6 +31,8 @@ func update_hud(data: Dictionary) -> void:
 	score = data.get("score", score)
 	state_note = data.get("state_note", state_note)
 	shield_charges = data.get("shield_charges", shield_charges)
+	difficulty_label = data.get("difficulty_label", difficulty_label)
+	difficulty_id = data.get("difficulty_id", difficulty_id)
 	queue_redraw()
 
 
@@ -39,6 +44,7 @@ func _draw() -> void:
 	_draw_timer(font, viewport_size)
 	_draw_ink_meter(font, viewport_size)
 	_draw_wave_label(font, viewport_size)
+	_draw_difficulty_rule(font)
 
 
 func _draw_shield_charges(font: Font) -> void:
@@ -107,3 +113,14 @@ func _draw_wave_label(font: Font, viewport_size: Vector2) -> void:
 	draw_string(font, Vector2(viewport_size.x - 320.0, 56.0), "Popped " + str(score), HORIZONTAL_ALIGNMENT_RIGHT, 290.0, 15, Color(0.07, 0.06, 0.05, 0.78))
 	if state_note != "":
 		draw_string(font, Vector2(viewport_size.x * 0.5 - 180.0, 71.0), state_note, HORIZONTAL_ALIGNMENT_CENTER, 360.0, 15, Color(0.07, 0.06, 0.05, 0.72))
+
+
+func _draw_difficulty_rule(font: Font) -> void:
+	var offset = Vector2.ZERO
+	var color = Color(0.07, 0.06, 0.05, 0.54)
+	if difficulty_id == "impossible":
+		var jitter_step = int(Time.get_ticks_msec() / 90) % 4
+		var jitter_offsets = [Vector2(-1.0, 0.0), Vector2(1.0, -1.0), Vector2(0.0, 1.0), Vector2(1.0, 1.0)]
+		offset = jitter_offsets[jitter_step]
+		color = Color(ORANGE.r, ORANGE.g, ORANGE.b, 0.78)
+	draw_string(font, Vector2(24.0, 60.0) + offset, "RULE: " + difficulty_label, HORIZONTAL_ALIGNMENT_LEFT, 220.0, 12, color)

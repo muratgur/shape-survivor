@@ -34,6 +34,7 @@ func _draw() -> void:
 	var title = "Still Technically A Shape" if won else "Flattened Into A Lesson"
 	draw_string(font, Vector2(viewport_size.x * 0.5 - 300.0, 160.0), title, HORIZONTAL_ALIGNMENT_CENTER, 600.0, 34, INK)
 	var rows = [
+		"Rule: " + str(result_data.get("difficulty_label", "EASY")),
 		"Survived: " + _format_time(float(result_data.get("survived_time", 0.0))),
 		"Waves cleared: " + str(result_data.get("waves_cleared", 0)),
 		"Shapes popped: " + str(result_data.get("enemies_popped", 0)),
@@ -42,7 +43,7 @@ func _draw() -> void:
 	]
 	for i in range(rows.size()):
 		draw_string(font, Vector2(viewport_size.x * 0.5 - 180.0, 230.0 + float(i) * 34.0), rows[i], HORIZONTAL_ALIGNMENT_CENTER, 360.0, 20, INK)
-	draw_string(font, Vector2(viewport_size.x * 0.5 - 240.0, viewport_size.y - 110.0), "Press R or Enter for character select", HORIZONTAL_ALIGNMENT_CENTER, 480.0, 20, Color(0.07, 0.06, 0.05, 0.72))
+	draw_string(font, Vector2(viewport_size.x * 0.5 - 280.0, viewport_size.y - 110.0), "R retries this doodle/rule. Enter returns to select.", HORIZONTAL_ALIGNMENT_CENTER, 560.0, 20, Color(0.07, 0.06, 0.05, 0.72))
 
 
 func _format_time(seconds: float) -> String:

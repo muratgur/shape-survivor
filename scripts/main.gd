@@ -43,6 +43,8 @@ var previous_state = GameState.SELECT
 var codex_return_state = GameState.SELECT
 var character_roster = []
 var selected_character_id = "balanced_blob"
+var difficulty_profiles = {}
+var selected_difficulty_id = "easy"
 var waves = []
 var upgrade_pool = []
 var current_wave_index = 0
@@ -83,6 +85,7 @@ var camera_shake_direction = Vector2.RIGHT
 func _ready() -> void:
 	rng.randomize()
 	_register_default_inputs()
+	_build_difficulty_profiles()
 	_build_character_roster()
 	_build_wave_data()
 	_build_upgrade_pool()
@@ -115,7 +118,7 @@ func _unhandled_input(event: InputEvent) -> void:
 				_resume_game()
 	elif event.is_action_pressed("restart"):
 		if game_state == GameState.RESULT or game_state == GameState.PAUSED:
-			_show_character_select()
+			_start_run(selected_character_id)
 	elif game_state == GameState.RESULT and event.is_action_pressed("confirm"):
 		_show_character_select()
 
@@ -158,6 +161,7 @@ func _create_scene_graph() -> void:
 	character_select.name = "CharacterSelect"
 	character_select.set_anchors_preset(Control.PRESET_FULL_RECT)
 	character_select.character_selected.connect(_on_character_selected)
+	character_select.difficulty_changed.connect(_on_difficulty_changed)
 	character_select.codex_requested.connect(_on_codex_requested)
 	ui_layer.add_child(character_select)
 
@@ -249,7 +253,7 @@ func _show_character_select() -> void:
 	pause_overlay.visible = false
 	hud.visible = false
 	player.visible = false
-	character_select.show_select(character_roster, selected_character_id)
+	character_select.show_select(character_roster, selected_character_id, _difficulty_select_data(), selected_difficulty_id)
 
 
 func _start_run(character_id: String = "") -> void:
@@ -268,6 +272,7 @@ func _start_run(character_id: String = "") -> void:
 	player.visible = true
 
 	player.reset(ARENA_SIZE * 0.5, _character_by_id(selected_character_id))
+	player.invulnerability_duration = _difficulty_iframe_duration()
 	base_damage_multiplier = 1.0
 	side_bonus_per_extra_side = 0.0
 	weapons = {
@@ -356,14 +361,14 @@ func _update_combat(delta: float) -> void:
 
 func _update_spawning(delta: float) -> void:
 	var wave = waves[current_wave_index]
-	if _regular_enemy_count() >= 80:
+	if _regular_enemy_count() >= _difficulty_enemy_cap():
 		return
 	spawn_timer -= delta
 	if spawn_timer > 0.0:
 		return
 	if not _wave_allows_spawn(wave):
 		return
-	spawn_timer = float(wave["spawn_rate"])
+	spawn_timer = float(wave["spawn_rate"]) * _difficulty_spawn_mult()
 	var mix: Array = wave["mix"]
 	if mix.is_empty():
 		return
@@ -500,7 +505,7 @@ func _check_contact_damage() -> void:
 		if player.position.distance_to(enemy.position) <= player.radius + enemy_contact_radius:
 			if not player.is_invulnerable() and shield_charges > 0:
 				shield_charges -= 1
-				player._invulnerable_time = 0.70
+				player._invulnerable_time = _difficulty_iframe_duration()
 				_spawn_attack_effect("pulse", 0.32, {"radius": player.radius + 14.0}, player)
 				continue
 			var did_hit: bool = player.take_damage(enemy.contact_damage, enemy.position)
@@ -733,13 +738,13 @@ func _update_active_sweeps(delta: float) -> void:
 
 
 func _spawn_enemy(kind: String, start_position: Vector2 = Vector2(-100000.0, -100000.0)):
-	if kind != "chunk_polygon" and _regular_enemy_count() >= 80:
+	if kind != "chunk_polygon" and _regular_enemy_count() >= _difficulty_enemy_cap():
 		return null
 	var spawn_position = start_position
 	if spawn_position.x < -90000.0:
 		spawn_position = _pick_spawn_position()
 	var enemy = EnemyScene.new()
-	enemy.setup(kind, spawn_position, player.position, ARENA_SIZE)
+	enemy.setup(kind, spawn_position, player.position, ARENA_SIZE, _current_difficulty_profile())
 	enemies_container.add_child(enemy)
 	enemies.append(enemy)
 	if kind == "chunk_polygon":
@@ -895,7 +900,7 @@ func _kill_enemy(enemy, reward: bool) -> void:
 			for i in range(12):
 				_spawn_pickup("ink", enemy.position + Vector2.RIGHT.rotated(TAU * float(i) / 12.0) * rng.randf_range(12.0, 44.0))
 		else:
-			var drop_count = int(round(float(waves[current_wave_index].get("drop_rate", 1.0))))
+			var drop_count = _scaled_ink_drop_count(float(waves[current_wave_index].get("drop_rate", 1.0)))
 			for i in range(drop_count):
 				_spawn_pickup("ink", enemy.position + Vector2(rng.randf_range(-8.0, 8.0), rng.randf_range(-8.0, 8.0)))
 			_roll_special_drop(enemy)
@@ -908,28 +913,29 @@ func _kill_enemy(enemy, reward: bool) -> void:
 func _roll_special_drop(enemy) -> void:
 	var jitter_pos = enemy.position + Vector2(rng.randf_range(-16.0, 16.0), rng.randf_range(-16.0, 16.0))
 	var special_roll = rng.randf()
+	var drop_mult = _difficulty_drop_mult()
 	match enemy.kind:
 		"needle_line":
-			if special_roll < 0.40:
+			if special_roll < 0.40 * drop_mult:
 				_spawn_pickup("speed_burst", jitter_pos)
-			elif player.hp < player.max_hp and rng.randf() < 0.04:
+			elif player.hp < player.max_hp and rng.randf() < 0.04 * drop_mult:
 				_spawn_pickup("health", jitter_pos)
 		"dizzy_spiral":
-			if special_roll < 0.50:
+			if special_roll < 0.50 * drop_mult:
 				_spawn_pickup("magnet_pulse", jitter_pos)
-			elif player.hp < player.max_hp and rng.randf() < 0.04:
+			elif player.hp < player.max_hp and rng.randf() < 0.04 * drop_mult:
 				_spawn_pickup("health", jitter_pos)
 		"smug_square":
-			if special_roll < 0.07:
+			if special_roll < 0.07 * drop_mult:
 				_spawn_pickup("damage_burst", jitter_pos)
-			elif player.hp < player.max_hp and special_roll < 0.12:
+			elif player.hp < player.max_hp and special_roll < 0.12 * drop_mult:
 				_spawn_pickup("health", jitter_pos)
 		_:
-			if special_roll < 0.08:
+			if special_roll < 0.08 * drop_mult:
 				_spawn_pickup("shield_fragment", jitter_pos)
-			elif special_roll < 0.20:
+			elif special_roll < 0.20 * drop_mult:
 				_spawn_pickup("jittery_fragment", jitter_pos)
-			elif player.hp < player.max_hp and special_roll < 0.25:
+			elif player.hp < player.max_hp and special_roll < 0.25 * drop_mult:
 				_spawn_pickup("health", jitter_pos)
 
 
@@ -1062,7 +1068,8 @@ func _finish_run(won: bool) -> void:
 		"waves_cleared": waves_cleared,
 		"enemies_popped": enemies_popped,
 		"ink_total": ink_total,
-		"upgrades_chosen": upgrades_chosen
+		"upgrades_chosen": upgrades_chosen,
+		"difficulty_label": str(_current_difficulty_profile().get("label", "EASY"))
 	})
 
 
@@ -1085,6 +1092,11 @@ func _on_player_died() -> void:
 
 func _on_character_selected(character: Dictionary) -> void:
 	_start_run(str(character.get("id", "balanced_blob")))
+
+
+func _on_difficulty_changed(difficulty_id: String) -> void:
+	if difficulty_profiles.has(difficulty_id):
+		selected_difficulty_id = difficulty_id
 
 
 func _on_upgrade_selected(choice: Dictionary) -> void:
@@ -1311,8 +1323,99 @@ func _update_hud(note: String = "") -> void:
 		"ink_threshold": int(wave.get("threshold", 42)),
 		"score": enemies_popped,
 		"state_note": note,
-		"shield_charges": shield_charges
+		"shield_charges": shield_charges,
+		"difficulty_label": str(_current_difficulty_profile().get("label", "EASY")),
+		"difficulty_id": selected_difficulty_id
 	})
+
+
+func _build_difficulty_profiles() -> void:
+	difficulty_profiles = {
+		"easy": {
+			"id": "easy",
+			"label": "EASY",
+			"description": "More margin for error.",
+			"hp_mult": 1.0,
+			"dmg_mult": 1.0,
+			"spawn_mult": 1.0,
+			"enemy_cap": 80,
+			"iframe_duration": 0.70,
+			"drop_mult": 1.0
+		},
+		"normal": {
+			"id": "normal",
+			"label": "NORMAL",
+			"description": "The standard rule.",
+			"hp_mult": 1.2,
+			"dmg_mult": 1.0,
+			"spawn_mult": 0.90,
+			"enemy_cap": 100,
+			"iframe_duration": 0.60,
+			"drop_mult": 0.90
+		},
+		"hard": {
+			"id": "hard",
+			"label": "HARD",
+			"description": "Pressed too firmly.",
+			"hp_mult": 1.6,
+			"dmg_mult": 1.5,
+			"spawn_mult": 0.70,
+			"enemy_cap": 140,
+			"iframe_duration": 0.50,
+			"drop_mult": 0.70
+		},
+		"impossible": {
+			"id": "impossible",
+			"label": "IMPOSSIBLE",
+			"description": "Everything is too close. Not recommended.",
+			"hp_mult": 2.0,
+			"dmg_mult": 2.0,
+			"spawn_mult": 0.50,
+			"enemy_cap": 160,
+			"iframe_duration": 0.40,
+			"drop_mult": 0.65
+		}
+	}
+
+
+func _difficulty_select_data() -> Array:
+	return [
+		difficulty_profiles["easy"],
+		difficulty_profiles["normal"],
+		difficulty_profiles["hard"],
+		difficulty_profiles["impossible"]
+	]
+
+
+func _current_difficulty_profile() -> Dictionary:
+	return difficulty_profiles.get(selected_difficulty_id, difficulty_profiles.get("easy", {}))
+
+
+func _difficulty_enemy_cap() -> int:
+	return int(_current_difficulty_profile().get("enemy_cap", 80))
+
+
+func _difficulty_spawn_mult() -> float:
+	return float(_current_difficulty_profile().get("spawn_mult", 1.0))
+
+
+func _difficulty_drop_mult() -> float:
+	return float(_current_difficulty_profile().get("drop_mult", 1.0))
+
+
+func _difficulty_iframe_duration() -> float:
+	return float(_current_difficulty_profile().get("iframe_duration", 0.70))
+
+
+func _scaled_ink_drop_count(base_drop_rate: float) -> int:
+	var drop_mult = _difficulty_drop_mult()
+	if is_equal_approx(drop_mult, 1.0):
+		return int(round(base_drop_rate))
+	var scaled = max(0.0, base_drop_rate * drop_mult)
+	var whole = int(floor(scaled))
+	if rng.randf() < scaled - float(whole):
+		whole += 1
+	return whole
 
 
 func _build_wave_data() -> void:
@@ -1518,11 +1621,9 @@ func _register_default_inputs() -> void:
 	_add_mouse_button("confirm", MOUSE_BUTTON_LEFT)
 	_add_key("pause_game", KEY_ESCAPE)
 	_add_key("restart", KEY_R)
-	_add_key("restart", KEY_ENTER)
 	_add_key("open_codex", KEY_C)
 	_add_joy_button("confirm", JOY_BUTTON_A)
 	_add_joy_button("pause_game", JOY_BUTTON_START)
-	_add_joy_button("restart", JOY_BUTTON_A)
 	_add_joy_button("move_left", JOY_BUTTON_DPAD_LEFT)
 	_add_joy_button("move_right", JOY_BUTTON_DPAD_RIGHT)
 	_add_joy_button("move_up", JOY_BUTTON_DPAD_UP)

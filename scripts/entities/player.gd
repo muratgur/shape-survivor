@@ -21,6 +21,7 @@ var cooldown_multiplier = 1.0
 var weapon_size_multiplier = 1.0
 var knockback_multiplier = 1.0
 var corner_bonus_enabled = false
+var invulnerability_duration = 0.70
 var visual_tags = {}
 var weapon_visuals = {}
 
@@ -55,6 +56,7 @@ func reset(start_position: Vector2, character_stats: Dictionary = {}) -> void:
 	weapon_size_multiplier = 1.0
 	knockback_multiplier = 1.0
 	corner_bonus_enabled = false
+	invulnerability_duration = 0.70
 	visual_tags.clear()
 	weapon_visuals.clear()
 	queue_redraw()
@@ -94,7 +96,7 @@ func take_damage(amount: int, source_position: Vector2) -> bool:
 	if _invulnerable_time > 0.0 or hp <= 0:
 		return false
 	hp = max(hp - amount, 0)
-	_invulnerable_time = 0.70
+	_invulnerable_time = invulnerability_duration
 	_flash_time = 0.08
 	var push_direction = (position - source_position).normalized()
 	if push_direction == Vector2.ZERO:

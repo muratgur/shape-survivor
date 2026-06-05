@@ -2,13 +2,18 @@ extends Control
 
 signal character_selected(character)
 signal codex_requested
+signal difficulty_changed(difficulty_id)
 
 const INK = Color(0.07, 0.06, 0.05)
 const PAPER = Color(0.96, 0.91, 0.80)
 const PAPER_DARK = Color(0.88, 0.80, 0.65)
+const ORANGE = Color(0.87, 0.48, 0.23)
 
 var characters = []
+var difficulties = []
 var selected_index = 0
+var selected_difficulty_index = 0
+var focus_target = "characters"
 var _pulse = 0.0
 
 
@@ -18,13 +23,20 @@ func _ready() -> void:
 	set_process(true)
 
 
-func show_select(new_characters: Array, initial_id: String = "balanced_blob") -> void:
+func show_select(new_characters: Array, initial_id: String = "balanced_blob", new_difficulties: Array = [], initial_difficulty_id: String = "easy") -> void:
 	characters = new_characters.duplicate(true)
+	difficulties = new_difficulties.duplicate(true)
 	selected_index = 0
+	selected_difficulty_index = 0
 	for i in range(characters.size()):
 		if str(characters[i].get("id", "")) == initial_id:
 			selected_index = i
 			break
+	for i in range(difficulties.size()):
+		if str(difficulties[i].get("id", "")) == initial_difficulty_id:
+			selected_difficulty_index = i
+			break
+	focus_target = "characters"
 	visible = true
 	queue_redraw()
 
@@ -43,27 +55,55 @@ func _input(event: InputEvent) -> void:
 	if not visible:
 		return
 	if event is InputEventMouseMotion:
-		var index = _card_index_at(event.position)
-		if index >= 0:
-			selected_index = index
-			queue_redraw()
+		var difficulty_index = _difficulty_index_at(event.position)
+		if difficulty_index >= 0:
+			focus_target = "difficulty"
+			selected_difficulty_index = difficulty_index
+		else:
+			var index = _card_index_at(event.position)
+			if index >= 0:
+				focus_target = "characters"
+				selected_index = index
+		queue_redraw()
 	elif event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
 		if _codex_button_rect().has_point(event.position):
 			accept_event()
 			codex_requested.emit()
 			return
+		var difficulty_index = _difficulty_index_at(event.position)
+		if difficulty_index >= 0:
+			focus_target = "difficulty"
+			_set_difficulty_index(difficulty_index)
+			return
 		var index = _card_index_at(event.position)
 		if index >= 0:
+			focus_target = "characters"
 			selected_index = index
 			_select_current()
 	elif event.is_action_pressed("ui_left") or event.is_action_pressed("move_left"):
-		selected_index = max(0, selected_index - 1)
+		if focus_target == "difficulty":
+			_set_difficulty_index(max(0, selected_difficulty_index - 1))
+		else:
+			selected_index = max(0, selected_index - 1)
 		queue_redraw()
 	elif event.is_action_pressed("ui_right") or event.is_action_pressed("move_right"):
-		selected_index = min(characters.size() - 1, selected_index + 1)
+		if focus_target == "difficulty":
+			_set_difficulty_index(min(difficulties.size() - 1, selected_difficulty_index + 1))
+		else:
+			selected_index = min(characters.size() - 1, selected_index + 1)
+		queue_redraw()
+	elif event.is_action_pressed("ui_up") or event.is_action_pressed("move_up"):
+		focus_target = "difficulty"
+		queue_redraw()
+	elif event.is_action_pressed("ui_down") or event.is_action_pressed("move_down"):
+		focus_target = "characters"
 		queue_redraw()
 	elif event.is_action_pressed("confirm"):
-		_select_current()
+		if focus_target == "difficulty":
+			focus_target = "characters"
+			queue_redraw()
+		else:
+			_select_current()
 	elif event.is_action_pressed("open_codex"):
 		accept_event()
 		codex_requested.emit()
@@ -72,6 +112,14 @@ func _input(event: InputEvent) -> void:
 func _select_current() -> void:
 	if selected_index >= 0 and selected_index < characters.size():
 		character_selected.emit(characters[selected_index])
+
+
+func _set_difficulty_index(index: int) -> void:
+	if difficulties.is_empty():
+		return
+	selected_difficulty_index = clamp(index, 0, difficulties.size() - 1)
+	difficulty_changed.emit(str(difficulties[selected_difficulty_index].get("id", "easy")))
+	queue_redraw()
 
 
 func _draw() -> void:
@@ -84,14 +132,15 @@ func _draw() -> void:
 		var x = fmod(float(i) * 97.0 + 42.0, viewport_size.x)
 		draw_line(Vector2(x, 0.0), Vector2(x + 130.0, viewport_size.y), Color(0.48, 0.42, 0.34, 0.07), 2.0)
 	draw_string(font, Vector2(viewport_size.x * 0.5 - 260.0, 72.0), "CHOOSE YOUR DOODLE", HORIZONTAL_ALIGNMENT_CENTER, 520.0, 30, INK)
-	draw_string(font, Vector2(viewport_size.x * 0.5 - 330.0, 106.0), "Arrow keys, A/D, gamepad, or click. Enter/Space starts. C opens the book.", HORIZONTAL_ALIGNMENT_CENTER, 660.0, 16, Color(0.07, 0.06, 0.05, 0.68))
+	draw_string(font, Vector2(viewport_size.x * 0.5 - 330.0, 106.0), "Left/right changes the focused row. Up/down moves between rule and doodle.", HORIZONTAL_ALIGNMENT_CENTER, 660.0, 15, Color(0.07, 0.06, 0.05, 0.68))
+	_draw_difficulty_row(font, viewport_size)
 	for i in range(characters.size()):
 		_draw_card(i, _card_rect(i), characters[i], font)
 	_draw_codex_button(font)
 
 
 func _draw_card(index: int, rect: Rect2, character: Dictionary, font: Font) -> void:
-	var selected = index == selected_index
+	var selected = index == selected_index and focus_target == "characters"
 	var grow = 8.0 + sin(_pulse * 5.0) * 1.8 if selected else 0.0
 	var card_rect = rect.grow(grow)
 	draw_rect(card_rect, INK)
@@ -199,7 +248,7 @@ func _card_rect(index: int) -> Rect2:
 	var card_size = Vector2(card_width, 330.0)
 	var total_width = card_size.x * float(count) + gap * float(count - 1)
 	var start_x = (viewport_size.x - total_width) * 0.5
-	var y = max(148.0, viewport_size.y * 0.5 - card_size.y * 0.36)
+	var y = max(180.0, viewport_size.y * 0.5 - card_size.y * 0.32)
 	return Rect2(Vector2(start_x + float(index) * (card_size.x + gap), y), card_size)
 
 
@@ -215,6 +264,55 @@ func _draw_codex_button(font: Font) -> void:
 	draw_rect(rect, PAPER)
 	draw_rect(rect, INK, false, 2.0)
 	draw_string(font, rect.position + Vector2(0.0, 24.0), "CODEX  C", HORIZONTAL_ALIGNMENT_CENTER, rect.size.x, 14, INK)
+
+
+func _draw_difficulty_row(font: Font, viewport_size: Vector2) -> void:
+	if difficulties.is_empty():
+		return
+	var total_width = 640.0
+	var start_x = (viewport_size.x - total_width) * 0.5
+	var y = 136.0
+	for i in range(difficulties.size()):
+		var rect = _difficulty_rect(i)
+		var selected = i == selected_difficulty_index
+		var impossible = str(difficulties[i].get("id", "")) == "impossible"
+		var focus = focus_target == "difficulty"
+		var alpha = 1.0 if selected else 0.42
+		var color = ORANGE if impossible and selected else Color(INK.r, INK.g, INK.b, alpha)
+		var offset = Vector2.ZERO
+		if impossible and selected:
+			var jitter_step = int(_pulse * 12.0) % 4
+			var jitter_offsets = [Vector2(-1.0, 0.0), Vector2(1.0, -1.0), Vector2(0.0, 1.0), Vector2(1.0, 1.0)]
+			offset = jitter_offsets[jitter_step]
+		var label = str(difficulties[i].get("label", "EASY"))
+		var descriptor = str(difficulties[i].get("description", ""))
+		draw_string(font, rect.position + Vector2(0.0, 22.0) + offset, label, HORIZONTAL_ALIGNMENT_CENTER, rect.size.x, 18 if selected and focus else 16, color)
+		draw_string(font, rect.position + Vector2(0.0, 42.0), descriptor, HORIZONTAL_ALIGNMENT_CENTER, rect.size.x, 11, Color(0.07, 0.06, 0.05, 0.50 if selected else 0.30))
+		if selected:
+			var underline_y = y + 28.0
+			var line_color = ORANGE if impossible else INK
+			if impossible:
+				draw_rect(Rect2(Vector2(rect.position.x + 14.0, underline_y - 2.0), Vector2(rect.size.x - 28.0, 6.0)), Color(line_color.r, line_color.g, line_color.b, 0.92))
+				draw_line(Vector2(rect.position.x + 19.0, underline_y + 5.0), Vector2(rect.end.x - 17.0, underline_y + 3.0), INK, 2.0)
+			else:
+				draw_line(Vector2(rect.position.x + 18.0, underline_y), Vector2(rect.end.x - 18.0, underline_y + sin(_pulse * 3.0) * 1.2), line_color, 4.0)
+	if focus_target == "difficulty":
+		draw_string(font, Vector2(start_x, y + 62.0), "RULE ROW", HORIZONTAL_ALIGNMENT_CENTER, total_width, 11, Color(0.07, 0.06, 0.05, 0.46))
+
+
+func _difficulty_rect(index: int) -> Rect2:
+	var viewport_size = get_viewport_rect().size
+	var total_width = 640.0
+	var item_width = total_width / max(float(difficulties.size()), 1.0)
+	var start_x = (viewport_size.x - total_width) * 0.5
+	return Rect2(Vector2(start_x + item_width * float(index), 120.0), Vector2(item_width, 58.0))
+
+
+func _difficulty_index_at(point: Vector2) -> int:
+	for i in range(difficulties.size()):
+		if _difficulty_rect(i).has_point(point):
+			return i
+	return -1
 
 
 func _codex_button_rect() -> Rect2:
