@@ -76,6 +76,14 @@ func _draw() -> void:
 			_draw_ink_birth(t, alpha)
 		"ink_collect":
 			_draw_ink_collect(t, alpha)
+		"pickup_collect":
+			_draw_pickup_collect(t, alpha)
+		"pickup_spike_burst":
+			_draw_pickup_spike_burst(t, alpha)
+		"health_birth":
+			_draw_health_birth(t, alpha)
+		"special_birth":
+			_draw_special_birth(t, alpha)
 		"tremor_warning":
 			_draw_tremor_warning(t, alpha)
 		_:
@@ -111,9 +119,10 @@ func _draw_wedge(t: float, alpha: float) -> void:
 
 func _draw_pulse(t: float, alpha: float) -> void:
 	var max_radius: float = data.get("radius", 150.0)
+	var pulse_color: Color = data.get("color", Color(0.85, 0.93, 1.0))
 	var pulse_radius = lerp(22.0, max_radius, t)
 	draw_arc(Vector2.ZERO, pulse_radius, 0.0, TAU, 96, Color(0.07, 0.06, 0.05, alpha), 6.0, true)
-	draw_arc(Vector2.ZERO, pulse_radius * 0.82, 0.0, TAU, 96, Color(0.85, 0.93, 1.0, alpha * 0.55), 10.0, true)
+	draw_arc(Vector2.ZERO, pulse_radius * 0.82, 0.0, TAU, 96, Color(pulse_color.r, pulse_color.g, pulse_color.b, alpha * 0.55), 10.0, true)
 
 
 func _draw_ruler(t: float, alpha: float) -> void:
@@ -180,6 +189,50 @@ func _draw_ink_collect(t: float, alpha: float) -> void:
 	if offset.length() <= 92.0 and offset.length() > 10.0:
 		draw_line(Vector2.ZERO, offset * min(0.82, snap + 0.12), Color(0.07, 0.06, 0.05, alpha * 0.20), 2.0)
 		draw_line(Vector2.ZERO, offset * min(0.70, snap), Color(1.0, 1.0, 1.0, alpha * 0.28), 1.0)
+
+
+func _draw_pickup_collect(t: float, alpha: float) -> void:
+	var target: Vector2 = data.get("target", Vector2.ZERO)
+	var offset = target - position
+	var trail_color: Color = data.get("color", Color.WHITE)
+	var width: float = data.get("width", 1.0)
+	var snap = 1.0 - pow(1.0 - t, 2.0)
+	var soft_color = Color(trail_color.r, trail_color.g, trail_color.b, alpha * 0.48)
+	var core_color = Color(trail_color.r, trail_color.g, trail_color.b, alpha * 0.24)
+	if offset.length() > 8.0:
+		draw_line(Vector2.ZERO, offset * min(0.92, snap + 0.16), soft_color, width, true)
+		draw_line(Vector2.ZERO, offset * min(0.76, snap), core_color, max(1.0, width * 0.55), true)
+	draw_arc(offset * snap, lerp(12.0, 4.0, t), 0.0, TAU, 28, Color(0.07, 0.06, 0.05, alpha * 0.36), 2.0, true)
+
+
+func _draw_pickup_spike_burst(t: float, alpha: float) -> void:
+	var spike_color: Color = data.get("color", Color(0.87, 0.48, 0.23))
+	var length: float = data.get("length", 25.0)
+	var start_radius = lerp(4.0, 12.0, t)
+	var end_radius = lerp(10.0, length, t)
+	for i in range(8):
+		var dir = Vector2.RIGHT.rotated(TAU * float(i) / 8.0)
+		draw_line(dir * start_radius, dir * end_radius, Color(spike_color.r, spike_color.g, spike_color.b, alpha * 0.62), 2.0, true)
+
+
+func _draw_health_birth(t: float, alpha: float) -> void:
+	var red = Color(0.91, 0.12, 0.18, alpha * 0.68)
+	var ink = Color(0.07, 0.06, 0.05, alpha * 0.46)
+	var length = lerp(6.0, 26.0, t)
+	draw_set_transform(Vector2.ZERO, PI * 0.25 + t * 0.35, Vector2.ONE)
+	draw_line(Vector2(-length, 0.0), Vector2(length, 0.0), ink, 5.0, true)
+	draw_line(Vector2(0.0, -length), Vector2(0.0, length), ink, 5.0, true)
+	draw_line(Vector2(-length, 0.0), Vector2(length, 0.0), red, 2.4, true)
+	draw_line(Vector2(0.0, -length), Vector2(0.0, length), red, 2.4, true)
+	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+
+
+func _draw_special_birth(t: float, alpha: float) -> void:
+	var flash_color: Color = data.get("color", Color(0.31, 0.84, 0.72))
+	var half = lerp(20.0, 7.0, t)
+	var rect = Rect2(Vector2(-half, -half), Vector2(half * 2.0, half * 2.0))
+	draw_rect(rect, Color(0.07, 0.06, 0.05, alpha * 0.42), false, 3.0, true)
+	draw_rect(rect.grow(-3.0), Color(flash_color.r, flash_color.g, flash_color.b, alpha * 0.42), false, 1.5, true)
 
 
 func _draw_tremor_warning(t: float, alpha: float) -> void:

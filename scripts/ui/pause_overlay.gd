@@ -18,4 +18,5 @@ func _draw() -> void:
 	draw_rect(box, INK)
 	draw_rect(box.grow(-5.0), Color(0.96, 0.91, 0.80))
 	draw_string(font, box.position + Vector2(0.0, 55.0), "PAUSED", HORIZONTAL_ALIGNMENT_CENTER, box.size.x, 28, INK)
-	draw_string(font, box.position + Vector2(0.0, 95.0), "Esc resumes. R returns to select.", HORIZONTAL_ALIGNMENT_CENTER, box.size.x, 16, Color(0.07, 0.06, 0.05, 0.72))
+	draw_string(font, box.position + Vector2(0.0, 95.0), "Esc resumes. C opens the book.", HORIZONTAL_ALIGNMENT_CENTER, box.size.x, 16, Color(0.07, 0.06, 0.05, 0.72))
+	draw_string(font, box.position + Vector2(0.0, 116.0), "R returns to select.", HORIZONTAL_ALIGNMENT_CENTER, box.size.x, 14, Color(0.07, 0.06, 0.05, 0.62))

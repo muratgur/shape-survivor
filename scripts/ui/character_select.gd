@@ -1,6 +1,7 @@
 extends Control
 
 signal character_selected(character)
+signal codex_requested
 
 const INK = Color(0.07, 0.06, 0.05)
 const PAPER = Color(0.96, 0.91, 0.80)
@@ -47,6 +48,10 @@ func _input(event: InputEvent) -> void:
 			selected_index = index
 			queue_redraw()
 	elif event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+		if _codex_button_rect().has_point(event.position):
+			accept_event()
+			codex_requested.emit()
+			return
 		var index = _card_index_at(event.position)
 		if index >= 0:
 			selected_index = index
@@ -59,6 +64,9 @@ func _input(event: InputEvent) -> void:
 		queue_redraw()
 	elif event.is_action_pressed("confirm"):
 		_select_current()
+	elif event.is_action_pressed("open_codex"):
+		accept_event()
+		codex_requested.emit()
 
 
 func _select_current() -> void:
@@ -76,9 +84,10 @@ func _draw() -> void:
 		var x = fmod(float(i) * 97.0 + 42.0, viewport_size.x)
 		draw_line(Vector2(x, 0.0), Vector2(x + 130.0, viewport_size.y), Color(0.48, 0.42, 0.34, 0.07), 2.0)
 	draw_string(font, Vector2(viewport_size.x * 0.5 - 260.0, 72.0), "CHOOSE YOUR DOODLE", HORIZONTAL_ALIGNMENT_CENTER, 520.0, 30, INK)
-	draw_string(font, Vector2(viewport_size.x * 0.5 - 330.0, 106.0), "Arrow keys, A/D, gamepad, or click. Enter/Space starts.", HORIZONTAL_ALIGNMENT_CENTER, 660.0, 16, Color(0.07, 0.06, 0.05, 0.68))
+	draw_string(font, Vector2(viewport_size.x * 0.5 - 330.0, 106.0), "Arrow keys, A/D, gamepad, or click. Enter/Space starts. C opens the book.", HORIZONTAL_ALIGNMENT_CENTER, 660.0, 16, Color(0.07, 0.06, 0.05, 0.68))
 	for i in range(characters.size()):
 		_draw_card(i, _card_rect(i), characters[i], font)
+	_draw_codex_button(font)
 
 
 func _draw_card(index: int, rect: Rect2, character: Dictionary, font: Font) -> void:
@@ -196,6 +205,18 @@ func _card_index_at(point: Vector2) -> int:
 		if _card_rect(i).has_point(point):
 			return i
 	return -1
+
+
+func _draw_codex_button(font: Font) -> void:
+	var rect = _codex_button_rect()
+	draw_rect(rect, PAPER)
+	draw_rect(rect, INK, false, 2.0)
+	draw_string(font, rect.position + Vector2(0.0, 24.0), "CODEX  C", HORIZONTAL_ALIGNMENT_CENTER, rect.size.x, 14, INK)
+
+
+func _codex_button_rect() -> Rect2:
+	var viewport_size = get_viewport_rect().size
+	return Rect2(Vector2(viewport_size.x - 152.0, 28.0), Vector2(116.0, 34.0))
 
 
 func _closed_points(points: PackedVector2Array) -> PackedVector2Array:

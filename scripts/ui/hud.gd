@@ -11,6 +11,7 @@ var ink_count = 0
 var ink_threshold = 18
 var score = 0
 var state_note = ""
+var shield_charges = 0
 
 
 func _ready() -> void:
@@ -26,6 +27,7 @@ func update_hud(data: Dictionary) -> void:
 	ink_threshold = data.get("ink_threshold", ink_threshold)
 	score = data.get("score", score)
 	state_note = data.get("state_note", state_note)
+	shield_charges = data.get("shield_charges", shield_charges)
 	queue_redraw()
 
 
@@ -33,9 +35,31 @@ func _draw() -> void:
 	var viewport_size = get_viewport_rect().size
 	var font = get_theme_default_font()
 	_draw_health(font)
+	_draw_shield_charges(font)
 	_draw_timer(font, viewport_size)
 	_draw_ink_meter(font, viewport_size)
 	_draw_wave_label(font, viewport_size)
+
+
+func _draw_shield_charges(font: Font) -> void:
+	if shield_charges <= 0:
+		return
+	var origin_x = 68.0 + float(max_hp) * 28.0 + 14.0
+	var y = 27.0
+	for i in range(3):
+		var cx = origin_x + float(i) * 14.0
+		var filled = i < shield_charges
+		var diamond = PackedVector2Array([
+			Vector2(cx, y - 7.0),
+			Vector2(cx + 6.0, y),
+			Vector2(cx, y + 7.0),
+			Vector2(cx - 6.0, y)
+		])
+		draw_colored_polygon(diamond, INK)
+		var inner = PackedVector2Array()
+		for p in diamond:
+			inner.append(Vector2(cx, y) + (p - Vector2(cx, y)) * 0.62)
+		draw_colored_polygon(inner, Color(0.31, 0.84, 0.72) if filled else Color(0.96, 0.91, 0.80))
 
 
 func _draw_health(font: Font) -> void:

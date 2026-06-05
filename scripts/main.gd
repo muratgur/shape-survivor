@@ -4,6 +4,9 @@ const ARENA_SIZE = Vector2(1600.0, 900.0)
 const PAPER = Color(0.96, 0.91, 0.80)
 const PAPER_DOT = Color(0.42, 0.36, 0.28, 0.16)
 const INK = Color(0.07, 0.06, 0.05)
+const HEALTH_RED = Color(0.91, 0.12, 0.18)
+const UTILITY_TEAL = Color(0.31, 0.84, 0.72)
+const POWER_ORANGE = Color(0.87, 0.48, 0.23)
 
 const PlayerScene = preload("res://scripts/entities/player.gd")
 const EnemyScene = preload("res://scripts/entities/enemy.gd")
@@ -16,8 +19,9 @@ const UpgradeDraftScene = preload("res://scripts/ui/upgrade_draft.gd")
 const ResultScreenScene = preload("res://scripts/ui/result_screen.gd")
 const PauseOverlayScene = preload("res://scripts/ui/pause_overlay.gd")
 const ShopScene = preload("res://scripts/ui/shop.gd")
+const CodexScene = preload("res://scripts/ui/codex_overlay.gd")
 
-enum GameState { SELECT, COMBAT, DRAFT, RESULT, PAUSED, SHOP }
+enum GameState { SELECT, COMBAT, DRAFT, RESULT, PAUSED, SHOP, CODEX }
 
 var rng = RandomNumberGenerator.new()
 var camera: Camera2D
@@ -32,9 +36,11 @@ var upgrade_draft
 var result_screen
 var pause_overlay
 var shop
+var codex_overlay
 
 var game_state = GameState.SELECT
 var previous_state = GameState.SELECT
+var codex_return_state = GameState.SELECT
 var character_roster = []
 var selected_character_id = "balanced_blob"
 var waves = []
@@ -60,6 +66,13 @@ var waves_cleared = 0
 var survived_time = 0.0
 var base_damage_multiplier = 1.0
 var side_bonus_per_extra_side = 0.0
+var speed_burst_timer: float = 0.0
+var speed_burst_base: float = 0.0
+var magnet_pulse_timer: float = 0.0
+var magnet_pulse_base: float = 0.0
+var damage_burst_timer: float = 0.0
+var temp_damage_mult: float = 1.0
+var shield_charges: int = 0
 var camera_base_position = ARENA_SIZE * 0.5
 var camera_shake_time = 0.0
 var camera_shake_duration = 0.0
@@ -92,7 +105,10 @@ func _process(delta: float) -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
-	if event.is_action_pressed("pause_game"):
+	if event.is_action_pressed("open_codex"):
+		if game_state == GameState.SELECT or game_state == GameState.PAUSED:
+			_open_codex(game_state)
+	elif event.is_action_pressed("pause_game"):
 			if game_state == GameState.COMBAT:
 				_pause_game()
 			elif game_state == GameState.PAUSED:
@@ -142,6 +158,7 @@ func _create_scene_graph() -> void:
 	character_select.name = "CharacterSelect"
 	character_select.set_anchors_preset(Control.PRESET_FULL_RECT)
 	character_select.character_selected.connect(_on_character_selected)
+	character_select.codex_requested.connect(_on_codex_requested)
 	ui_layer.add_child(character_select)
 
 	hud = HudScene.new()
@@ -172,6 +189,12 @@ func _create_scene_graph() -> void:
 	shop.shop_closed.connect(_on_shop_closed)
 	ui_layer.add_child(shop)
 
+	codex_overlay = CodexScene.new()
+	codex_overlay.name = "CodexOverlay"
+	codex_overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
+	codex_overlay.codex_closed.connect(_on_codex_closed)
+	ui_layer.add_child(codex_overlay)
+
 
 func _update_camera_zoom() -> void:
 	if not is_instance_valid(camera):
@@ -181,14 +204,14 @@ func _update_camera_zoom() -> void:
 	camera.zoom = Vector2(zoom, zoom)
 
 
-func _start_camera_shake(source_position: Vector2) -> void:
+func _start_camera_shake(source_position: Vector2, amplitude: float = 5.5, duration: float = 0.10) -> void:
 	var direction = (player.position - source_position).normalized()
 	if direction == Vector2.ZERO:
 		direction = Vector2.RIGHT
 	camera_shake_direction = direction
-	camera_shake_duration = 0.10
+	camera_shake_duration = duration
 	camera_shake_time = camera_shake_duration
-	camera_shake_amplitude = 5.5
+	camera_shake_amplitude = amplitude
 
 
 func _update_camera_shake(delta: float) -> void:
@@ -222,6 +245,7 @@ func _show_character_select() -> void:
 	result_screen.hide_result()
 	upgrade_draft.hide_draft()
 	shop.hide_shop()
+	codex_overlay.hide_codex()
 	pause_overlay.visible = false
 	hud.visible = false
 	player.visible = false
@@ -237,6 +261,7 @@ func _start_run(character_id: String = "") -> void:
 	result_screen.hide_result()
 	upgrade_draft.hide_draft()
 	shop.hide_shop()
+	codex_overlay.hide_codex()
 	character_select.hide_select()
 	pause_overlay.visible = false
 	hud.visible = true
@@ -258,6 +283,13 @@ func _start_run(character_id: String = "") -> void:
 	upgrades_chosen = 0
 	waves_cleared = 0
 	survived_time = 0.0
+	speed_burst_timer = 0.0
+	speed_burst_base = 0.0
+	magnet_pulse_timer = 0.0
+	magnet_pulse_base = 0.0
+	damage_burst_timer = 0.0
+	temp_damage_mult = 1.0
+	shield_charges = 0
 	_refresh_player_damage_multiplier()
 	_refresh_weapon_visuals()
 	_start_wave(0)
@@ -301,6 +333,7 @@ func _start_wave(index: int) -> void:
 func _update_combat(delta: float) -> void:
 	survived_time += delta
 	wave_time_left -= delta
+	_update_drop_buffs(delta)
 	player.update_player(delta, true)
 	_update_weapons(delta)
 	_update_pending_volunteer_shots(delta)
@@ -379,15 +412,72 @@ func _update_pickups(delta: float) -> void:
 			continue
 		if pickup.update_pickup(delta, player):
 			var collect_position = pickup.position
-			if pickup.pickup_kind == "health":
-				player.heal(pickup.value)
-			else:
-				ink_this_wave += pickup.value
-				ink_total += pickup.value
-				ink_bank += pickup.value
-				_spawn_attack_effect("ink_collect", 0.12, {"position": collect_position, "target": player.position})
+			match pickup.pickup_kind:
+				"health":
+					player.heal(pickup.value)
+					_spawn_pickup_collect_effect(pickup.pickup_kind, collect_position)
+					_spawn_attack_effect("pulse", 0.22, {"radius": 40.0, "position": collect_position, "color": HEALTH_RED})
+				"speed_burst":
+					_collect_speed_burst()
+					_spawn_pickup_collect_effect(pickup.pickup_kind, collect_position)
+					_spawn_attack_effect("pulse", 0.22, {"radius": 36.0, "position": collect_position})
+				"shield_fragment":
+					shield_charges = min(shield_charges + 1, 3)
+					_spawn_pickup_collect_effect(pickup.pickup_kind, collect_position)
+					_spawn_attack_effect("pulse", 0.24, {"radius": player.radius + 10.0}, player)
+				"magnet_pulse":
+					_collect_magnet_pulse()
+					_spawn_pickup_collect_effect(pickup.pickup_kind, collect_position)
+					_spawn_attack_effect("pulse", 0.30, {"radius": player.magnet_radius * 0.5, "position": collect_position})
+				"damage_burst":
+					_collect_damage_burst()
+					_spawn_pickup_collect_effect(pickup.pickup_kind, collect_position)
+					_spawn_attack_effect("pickup_spike_burst", 0.24, {"position": collect_position, "color": POWER_ORANGE, "length": 26.0})
+					_spawn_attack_effect("pulse", 0.22, {"radius": 32.0, "position": collect_position})
+				"jittery_fragment":
+					_spawn_pickup_collect_effect(pickup.pickup_kind, collect_position)
+					_collect_jittery_fragment(collect_position)
+				_:
+					ink_this_wave += pickup.value
+					ink_total += pickup.value
+					ink_bank += pickup.value
+					_spawn_attack_effect("ink_collect", 0.12, {"position": collect_position, "target": player.position})
 			pickups.erase(pickup)
 			pickup.queue_free()
+
+
+func _collect_speed_burst() -> void:
+	if speed_burst_timer <= 0.0:
+		speed_burst_base = player.move_speed
+		player.move_speed = speed_burst_base * 1.45
+	speed_burst_timer = 5.0
+
+
+func _collect_magnet_pulse() -> void:
+	if magnet_pulse_timer <= 0.0:
+		magnet_pulse_base = player.magnet_radius
+		player.magnet_radius = magnet_pulse_base * 3.0
+	magnet_pulse_timer = 3.0
+
+
+func _collect_damage_burst() -> void:
+	if damage_burst_timer <= 0.0:
+		temp_damage_mult = 1.5
+	damage_burst_timer = 6.0
+
+
+func _collect_jittery_fragment(burst_origin: Vector2) -> void:
+	for enemy in enemies.duplicate():
+		if not is_instance_valid(enemy) or not enemy.is_active():
+			continue
+		if burst_origin.distance_to(enemy.position) <= 80.0:
+			_damage_enemy(enemy, 3.0, burst_origin, 90.0, false)
+	var push_dir = (player.position - burst_origin).normalized()
+	if push_dir == Vector2.ZERO:
+		push_dir = Vector2.RIGHT
+	player._knockback_velocity += push_dir * 200.0
+	_spawn_attack_effect("pulse", 0.28, {"radius": 84.0, "position": burst_origin})
+	_start_camera_shake(burst_origin, 2.4, 0.08)
 
 
 func _update_effects(delta: float) -> void:
@@ -408,11 +498,34 @@ func _check_contact_damage() -> void:
 		if enemy.has_method("get_contact_radius"):
 			enemy_contact_radius = enemy.get_contact_radius()
 		if player.position.distance_to(enemy.position) <= player.radius + enemy_contact_radius:
+			if not player.is_invulnerable() and shield_charges > 0:
+				shield_charges -= 1
+				player._invulnerable_time = 0.70
+				_spawn_attack_effect("pulse", 0.32, {"radius": player.radius + 14.0}, player)
+				continue
 			var did_hit: bool = player.take_damage(enemy.contact_damage, enemy.position)
 			if did_hit:
 				var away = (player.position - enemy.position).normalized()
 				_spawn_directed_hit_fragments(player.position, away, Color.WHITE, 4, 0.20)
 				_start_camera_shake(enemy.position)
+
+
+func _update_drop_buffs(delta: float) -> void:
+	if speed_burst_timer > 0.0:
+		speed_burst_timer -= delta
+		if speed_burst_timer <= 0.0:
+			speed_burst_timer = 0.0
+			player.move_speed = speed_burst_base
+	if magnet_pulse_timer > 0.0:
+		magnet_pulse_timer -= delta
+		if magnet_pulse_timer <= 0.0:
+			magnet_pulse_timer = 0.0
+			player.magnet_radius = magnet_pulse_base
+	if damage_burst_timer > 0.0:
+		damage_burst_timer -= delta
+		if damage_burst_timer <= 0.0:
+			damage_burst_timer = 0.0
+			temp_damage_mult = 1.0
 
 
 func _update_weapons(delta: float) -> void:
@@ -692,6 +805,31 @@ func _spawn_pickup(kind: String, pickup_position: Vector2) -> void:
 	pickups.append(pickup)
 	if kind == "ink":
 		_spawn_attack_effect("ink_birth", 0.18, {"position": pickup_position})
+	elif kind == "health":
+		_spawn_attack_effect("health_birth", 0.20, {"position": pickup_position})
+	else:
+		_spawn_attack_effect("special_birth", 0.15, {"position": pickup_position, "color": _pickup_feedback_color(kind)})
+
+
+func _spawn_pickup_collect_effect(kind: String, collect_position: Vector2) -> void:
+	var width = 2.0 if kind in ["health", "damage_burst", "jittery_fragment"] else 1.0
+	_spawn_attack_effect("pickup_collect", 0.16, {
+		"position": collect_position,
+		"target": player.position,
+		"color": _pickup_feedback_color(kind),
+		"width": width
+	})
+
+
+func _pickup_feedback_color(kind: String) -> Color:
+	match kind:
+		"health":
+			return HEALTH_RED
+		"speed_burst", "shield_fragment", "magnet_pulse":
+			return UTILITY_TEAL
+		"damage_burst", "jittery_fragment":
+			return POWER_ORANGE
+	return PAPER
 
 
 func _spawn_attack_effect(kind: String, duration: float, data: Dictionary, target = null) -> void:
@@ -736,7 +874,7 @@ func _spawn_directed_hit_fragments(source_position: Vector2, base_direction: Vec
 func _damage_enemy(enemy, raw_damage: float, source_position: Vector2, knockback: float, corner_hit: bool) -> void:
 	if not is_instance_valid(enemy):
 		return
-	var final_damage = raw_damage * player.damage_multiplier
+	var final_damage = raw_damage * player.damage_multiplier * temp_damage_mult
 	if corner_hit and player.corner_bonus_enabled:
 		final_damage *= 1.30
 	var push_direction = enemy.position - source_position
@@ -760,12 +898,39 @@ func _kill_enemy(enemy, reward: bool) -> void:
 			var drop_count = int(round(float(waves[current_wave_index].get("drop_rate", 1.0))))
 			for i in range(drop_count):
 				_spawn_pickup("ink", enemy.position + Vector2(rng.randf_range(-8.0, 8.0), rng.randf_range(-8.0, 8.0)))
-			if player.hp < player.max_hp and rng.randf() < 0.05:
-				_spawn_pickup("health", enemy.position + Vector2(rng.randf_range(-16.0, 16.0), rng.randf_range(-16.0, 16.0)))
+			_roll_special_drop(enemy)
 	enemies.erase(enemy)
 	enemy.queue_free()
 	if was_boss and reward:
 		_finish_run(true)
+
+
+func _roll_special_drop(enemy) -> void:
+	var jitter_pos = enemy.position + Vector2(rng.randf_range(-16.0, 16.0), rng.randf_range(-16.0, 16.0))
+	var special_roll = rng.randf()
+	match enemy.kind:
+		"needle_line":
+			if special_roll < 0.40:
+				_spawn_pickup("speed_burst", jitter_pos)
+			elif player.hp < player.max_hp and rng.randf() < 0.04:
+				_spawn_pickup("health", jitter_pos)
+		"dizzy_spiral":
+			if special_roll < 0.50:
+				_spawn_pickup("magnet_pulse", jitter_pos)
+			elif player.hp < player.max_hp and rng.randf() < 0.04:
+				_spawn_pickup("health", jitter_pos)
+		"smug_square":
+			if special_roll < 0.07:
+				_spawn_pickup("damage_burst", jitter_pos)
+			elif player.hp < player.max_hp and special_roll < 0.12:
+				_spawn_pickup("health", jitter_pos)
+		_:
+			if special_roll < 0.08:
+				_spawn_pickup("shield_fragment", jitter_pos)
+			elif special_roll < 0.20:
+				_spawn_pickup("jittery_fragment", jitter_pos)
+			elif player.hp < player.max_hp and special_roll < 0.25:
+				_spawn_pickup("health", jitter_pos)
 
 
 func _remove_projectile(projectile) -> void:
@@ -815,6 +980,30 @@ func _on_shop_closed() -> void:
 	_begin_post_wave_draft()
 
 
+func _on_codex_requested() -> void:
+	_open_codex(GameState.SELECT)
+
+
+func _open_codex(return_state) -> void:
+	codex_return_state = return_state
+	game_state = GameState.CODEX
+	if return_state == GameState.SELECT:
+		character_select.visible = false
+	pause_overlay.visible = false
+	codex_overlay.show_codex()
+
+
+func _on_codex_closed() -> void:
+	codex_overlay.hide_codex()
+	game_state = codex_return_state
+	if game_state == GameState.SELECT:
+		character_select.visible = true
+		character_select.queue_redraw()
+	if game_state == GameState.PAUSED:
+		pause_overlay.visible = true
+		pause_overlay.queue_redraw()
+
+
 func _build_shop_offers() -> Array:
 	var pool = _shop_pool()
 	pool.shuffle()
@@ -862,6 +1051,7 @@ func _finish_run(won: bool) -> void:
 	hud.visible = false
 	upgrade_draft.hide_draft()
 	shop.hide_shop()
+	codex_overlay.hide_codex()
 	pause_overlay.visible = false
 	if won:
 		waves_cleared = waves.size()
@@ -1120,7 +1310,8 @@ func _update_hud(note: String = "") -> void:
 		"ink_count": ink_this_wave,
 		"ink_threshold": int(wave.get("threshold", 42)),
 		"score": enemies_popped,
-		"state_note": note
+		"state_note": note,
+		"shield_charges": shield_charges
 	})
 
 
@@ -1296,6 +1487,7 @@ func _register_default_inputs() -> void:
 	_ensure_action("confirm")
 	_ensure_action("pause_game")
 	_ensure_action("restart")
+	_ensure_action("open_codex")
 	_add_key("move_left", KEY_A)
 	_add_key("move_left", KEY_LEFT)
 	_add_key("move_right", KEY_D)
@@ -1310,6 +1502,7 @@ func _register_default_inputs() -> void:
 	_add_key("pause_game", KEY_ESCAPE)
 	_add_key("restart", KEY_R)
 	_add_key("restart", KEY_ENTER)
+	_add_key("open_codex", KEY_C)
 	_add_joy_button("confirm", JOY_BUTTON_A)
 	_add_joy_button("pause_game", JOY_BUTTON_START)
 	_add_joy_button("restart", JOY_BUTTON_A)
