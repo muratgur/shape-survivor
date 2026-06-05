@@ -885,12 +885,14 @@ func _apply_upgrade(choice: Dictionary) -> void:
 			player.add_visual_tag("corner_nubs", 3)
 		"volunteer_dot_plus":
 			_upgrade_weapon("volunteer_dot")
-		"corner_cannon", "dot_swarm", "rude_triangle", "orbit_ruler", "apology_orb":
+		"corner_cannon", "dot_swarm", "rude_triangle", "orbit_ruler", "apology_orb", "panic_pinwheel":
 			_upgrade_weapon(id)
 			if id == "apology_orb":
 				player.add_visual_tag("pulse_ring")
 			elif id == "orbit_ruler":
 				player.add_visual_tag("ruler_halo")
+			elif id == "panic_pinwheel":
+				player.add_visual_tag("orbit_ticks")
 		"scoot_marks":
 			player.move_speed *= 1.0 + 0.12 * scale
 		"very_serious_rectangle":
@@ -918,31 +920,40 @@ func _refresh_weapon_visuals() -> void:
 
 
 func _build_draft_choices(small_power: bool) -> Array:
+	var wave = waves[current_wave_index]
 	var pool = upgrade_pool.duplicate(true)
 	pool.shuffle()
 	var choices = []
-	var desired_ids = []
-	if current_wave_index == 0:
-		desired_ids = ["corner_cannon", "pocket_magnet", "meaner_corners"]
-	elif current_wave_index == 1:
-		desired_ids = ["dot_swarm", "comfy_blob", "side_hustle"]
-	elif current_wave_index == 2:
-		desired_ids = ["apology_orb", "orbit_ruler", "very_serious_rectangle"]
-	else:
-		desired_ids = ["volunteer_dot_plus", "comfy_blob", "pocket_magnet"]
+	var desired_ids: Array = wave.get("draft_offers", [])
+	var has_explicit_offers = desired_ids.size() > 0
+	if not has_explicit_offers:
+		if current_wave_index == 0:
+			desired_ids = ["corner_cannon", "pocket_magnet", "meaner_corners"]
+		elif current_wave_index == 1:
+			desired_ids = ["dot_swarm", "comfy_blob", "side_hustle"]
+		elif current_wave_index == 2:
+			desired_ids = ["apology_orb", "orbit_ruler", "very_serious_rectangle"]
+		else:
+			desired_ids = ["volunteer_dot_plus", "comfy_blob", "pocket_magnet"]
 	for id in desired_ids:
-		var upgrade = _upgrade_by_id(id)
+		var upgrade = _upgrade_by_id(str(id))
 		if not upgrade.is_empty():
 			choices.append(upgrade)
-	for upgrade in pool:
-		if choices.size() >= 3:
-			break
-		if not _choice_list_has_id(choices, str(upgrade.get("id", ""))):
-			choices.append(upgrade)
+	if not has_explicit_offers:
+		for upgrade in pool:
+			if choices.size() >= 3:
+				break
+			var upgrade_id = str(upgrade.get("id", ""))
+			if upgrade_id == "panic_pinwheel":
+				continue
+			if not _choice_list_has_id(choices, upgrade_id):
+				choices.append(upgrade)
 	if small_power and not choices.is_empty():
 		choices[0] = choices[0].duplicate(true)
 		choices[0]["small"] = true
 		choices[0]["stat"] = "Small " + str(choices[0].get("stat", "boost"))
+	if has_explicit_offers:
+		return choices
 	return choices.slice(0, 3)
 
 
@@ -968,7 +979,7 @@ func _upgrade_by_id(id: String) -> Dictionary:
 
 
 func _is_weapon_id(id: String) -> bool:
-	return id in ["volunteer_dot", "corner_cannon", "dot_swarm", "rude_triangle", "orbit_ruler", "apology_orb"]
+	return id in ["volunteer_dot", "corner_cannon", "dot_swarm", "rude_triangle", "orbit_ruler", "apology_orb", "panic_pinwheel"]
 
 
 func _nearest_enemy(max_distance: float = 999999.0):
@@ -1036,28 +1047,28 @@ func _update_hud(note: String = "") -> void:
 func _build_wave_data() -> void:
 	waves = [
 		{
-			"label": "Wave 1/6",
+			"label": "Wave 1/7",
 			"duration": 45.0,
 			"spawn_rate": 1.20,
 			"threshold": 18,
 			"mix": ["wobble_circle", "wobble_circle", "smug_square"]
 		},
 		{
-			"label": "Wave 2/6",
+			"label": "Wave 2/7",
 			"duration": 60.0,
 			"spawn_rate": 0.80,
 			"threshold": 30,
 			"mix": ["wobble_circle", "smug_square", "pointy_triangle", "pointy_triangle"]
 		},
 		{
-			"label": "Wave 3/6",
+			"label": "Wave 3/7",
 			"duration": 75.0,
 			"spawn_rate": 0.55,
 			"threshold": 42,
 			"mix": ["wobble_circle", "smug_square", "pointy_triangle", "needle_line", "needle_line", "dizzy_spiral"]
 		},
 		{
-			"label": "Wave 4/6: Contested Routes",
+			"label": "Wave 4/7: Contested Routes",
 			"duration": 65.0,
 			"spawn_rate": 0.60,
 			"threshold": 48,
@@ -1065,7 +1076,7 @@ func _build_wave_data() -> void:
 			"mix": ["wobble_circle", "needle_line", "needle_line", "dizzy_spiral", "dizzy_spiral", "pointy_triangle"]
 		},
 		{
-			"label": "Wave 5/6: Polygon Tremor",
+			"label": "Wave 5/7: Polygon Tremor",
 			"duration": 32.0,
 			"spawn_rate": 1.25,
 			"threshold": 0,
@@ -1075,7 +1086,18 @@ func _build_wave_data() -> void:
 			"mix": ["wobble_circle", "wobble_circle", "smug_square", "smug_square", "pointy_triangle", "needle_line"]
 		},
 		{
-			"label": "Boss 6/6",
+			"label": "Wave 6/7: The Proof",
+			"duration": 40.0,
+			"spawn_rate": 0.55,
+			"threshold": 0,
+			"draft_after": true,
+			"draft_offers": ["panic_pinwheel"],
+			"drop_rate": 1.0,
+			"spawn_pattern": "steady",
+			"mix": ["needle_line", "needle_line", "dizzy_spiral"]
+		},
+		{
+			"label": "Boss 7/7",
 			"duration": 90.0,
 			"spawn_rate": 1.40,
 			"threshold": 42,
@@ -1170,6 +1192,7 @@ func _build_upgrade_pool() -> void:
 		{"id": "side_hustle", "name": "SIDE HUSTLE", "line": "More sides, more opinions.", "stat": "+1 side, side damage", "icon": "blob"},
 		{"id": "corner_applause", "name": "CORNER APPLAUSE", "line": "Sharp hits get cheers.", "stat": "+30% corner-hit damage", "icon": "square"},
 		{"id": "volunteer_dot_plus", "name": "VOLUNTEER DOT+", "line": "The anxious dot practices bonking.", "stat": "+2 damage, later +radius", "icon": "volunteer_dot"},
+		{"id": "panic_pinwheel", "name": "PANIC PINWHEEL", "line": "Spinning bars rake the room.", "stat": "Unlock/upgrade weapon", "icon": "pinwheel"},
 		{"id": "corner_cannon", "name": "CORNER CANNON", "line": "Squares leave in four directions.", "stat": "Unlock/upgrade weapon", "icon": "square"},
 		{"id": "dot_swarm", "name": "DOT SWARM", "line": "Dots orbit, then abandon you.", "stat": "Unlock/upgrade weapon", "icon": "dot"},
 		{"id": "rude_triangle", "name": "RUDE TRIANGLE", "line": "A wedge interrupts someone.", "stat": "Unlock/upgrade weapon", "icon": "triangle"},

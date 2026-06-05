@@ -143,7 +143,8 @@ func _card_rect(index: int) -> Rect2:
 	var viewport_size = get_viewport_rect().size
 	var card_size = Vector2(245.0, 300.0)
 	var gap = 28.0
-	var total_width = card_size.x * 3.0 + gap * 2.0
+	var count = max(choices.size(), 1)
+	var total_width = card_size.x * float(count) + gap * float(max(count - 1, 0))
 	var start_x = (viewport_size.x - total_width) * 0.5
 	var y = max(155.0, viewport_size.y * 0.5 - card_size.y * 0.35)
 	return Rect2(Vector2(start_x + float(index) * (card_size.x + gap), y), card_size)
