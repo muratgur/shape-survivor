@@ -1,0 +1,8 @@
+res://scripts/main.gd
+res://scripts/entities/effect.gd
+res://scripts/entities/enemy.gd
+res://scripts/entities/pickup.gd
+res://scripts/entities/player.gd
+res://scripts/ui/hud.gd
+res://scripts/ui/pause_overlay.gd
+res://scripts/ui/result_screen.gd
