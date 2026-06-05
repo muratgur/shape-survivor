@@ -6,6 +6,14 @@ Pick a nervous doodle, survive eight increasingly mean waves, and draft upgrades
 
 ![sketchbook](docs/screenshots/sketchbook.gif)
 
+## Built with Ordinus
+
+This entire game — design, code, art-via-code, balancing — was built collaboratively with my multi-agent development system **[Ordinus](https://github.com/muratgur/ordinus)**.
+
+Ordinus is a multi-agent setup that coordinates specialized agents (planning, GDScript implementation, visual design, balance review, etc.) over a shared workboard. Shape Survivor was one of its first end-to-end use cases: a complete, playable game shipped as a single Godot project with no human-written code — only human direction.
+
+If you're curious about the workflow, the agent loops, or want to try Ordinus on your own project, the repo is here: **https://github.com/muratgur/ordinus**
+
 ## Highlights
 
 - **6 playable doodles** — Balanced Blob, Quick Dot, Sturdy Square, Fancy Hex, Timid Triangle, Grumpy Wedge — each with its own stats, starter weapon, body silhouette, and idle animation.
@@ -62,14 +70,6 @@ scripts/
     codex_overlay.gd       # In-game catalogue
     codex_registry.gd      # Codex content
 ```
-
-## Built with Ordinus
-
-This entire game — design, code, art-via-code, balancing — was built collaboratively with my multi-agent development system **[Ordinus](https://github.com/muratgur/ordinus)**.
-
-Ordinus is a multi-agent setup that coordinates specialized agents (planning, GDScript implementation, visual design, balance review, etc.) over a shared workboard. Shape Survivor was one of its first end-to-end use cases: a complete, playable game shipped as a single Godot project with no human-written code — only human direction.
-
-If you're curious about the workflow, the agent loops, or want to try Ordinus on your own project, the repo is here: **https://github.com/muratgur/ordinus**
 
 ## Gallery
 
