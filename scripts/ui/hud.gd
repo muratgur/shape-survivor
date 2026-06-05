@@ -4,6 +4,8 @@ const INK = Color(0.07, 0.06, 0.05)
 const PAPER_LINE = Color(0.48, 0.42, 0.34, 0.38)
 const ORANGE = Color(0.87, 0.48, 0.23)
 
+signal pause_clicked
+
 var hp = 5
 var max_hp = 5
 var time_left = 45.0
@@ -16,9 +18,54 @@ var shield_charges = 0
 var difficulty_label = "EASY"
 var difficulty_id = "easy"
 
+var show_pause_button = false
+var is_hovering_pause = false
+var pause_invert_timer = 0.0
+var pause_button: Control
+
 
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_create_pause_button()
+
+
+func _create_pause_button() -> void:
+	pause_button = Control.new()
+	pause_button.name = "PauseButton"
+	pause_button.mouse_filter = Control.MOUSE_FILTER_STOP
+	pause_button.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+	pause_button.anchor_left = 1.0
+	pause_button.anchor_right = 1.0
+	pause_button.anchor_top = 0.0
+	pause_button.anchor_bottom = 0.0
+	pause_button.offset_left = -68
+	pause_button.offset_right = -20
+	pause_button.offset_top = 20
+	pause_button.offset_bottom = 68
+	pause_button.mouse_entered.connect(_on_pause_hover.bind(true))
+	pause_button.mouse_exited.connect(_on_pause_hover.bind(false))
+	pause_button.gui_input.connect(_on_pause_input)
+	add_child(pause_button)
+	pause_button.visible = false
+
+
+func _on_pause_hover(hovering: bool) -> void:
+	is_hovering_pause = hovering
+	queue_redraw()
+
+
+func _on_pause_input(event: InputEvent) -> void:
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
+		pause_invert_timer = 0.1
+		pause_clicked.emit()
+		queue_redraw()
+
+
+func _process(delta: float) -> void:
+	if pause_invert_timer > 0.0:
+		pause_invert_timer -= delta
+		if pause_invert_timer <= 0.0:
+			queue_redraw()
 
 
 func update_hud(data: Dictionary) -> void:
@@ -33,6 +80,9 @@ func update_hud(data: Dictionary) -> void:
 	shield_charges = data.get("shield_charges", shield_charges)
 	difficulty_label = data.get("difficulty_label", difficulty_label)
 	difficulty_id = data.get("difficulty_id", difficulty_id)
+	show_pause_button = data.get("show_pause_button", false)
+	if pause_button:
+		pause_button.visible = show_pause_button
 	queue_redraw()
 
 
@@ -45,6 +95,58 @@ func _draw() -> void:
 	_draw_ink_meter(font, viewport_size)
 	_draw_wave_label(font, viewport_size)
 	_draw_difficulty_rule(font)
+	_draw_pause_button(font, viewport_size)
+
+
+func _draw_pause_button(font: Font, viewport_size: Vector2) -> void:
+	if not show_pause_button:
+		return
+	
+	var rect = Rect2(viewport_size.x - 68, 20, 48, 48)
+	var center = rect.get_center()
+	var scale = 1.1 if is_hovering_pause else 1.0
+	var thickness = 4.0 if is_hovering_pause else 2.0
+	
+	var draw_ink = INK
+	var draw_paper = Color(0.96, 0.91, 0.80)
+	
+	if pause_invert_timer > 0.0:
+		draw_ink = draw_paper
+		draw_paper = INK
+	
+	var frame_rect = Rect2(center - Vector2(20, 20) * scale, Vector2(40, 40) * scale)
+	_draw_wobbly_rect(frame_rect, draw_ink, thickness)
+	
+	var bar_w = 6.0 * scale
+	var bar_h = 24.0 * scale
+	var spacing = 10.0 * scale
+	var bar1_rect = Rect2(center + Vector2(-spacing * 0.5 - bar_w, -bar_h * 0.5), Vector2(bar_w, bar_h))
+	var bar2_rect = Rect2(center + Vector2(spacing * 0.5, -bar_h * 0.5), Vector2(bar_w, bar_h))
+	
+	_draw_wobbly_rect(bar1_rect, draw_ink, 1.0, true, draw_ink)
+	_draw_wobbly_rect(bar2_rect, draw_ink, 1.0, true, draw_ink)
+	
+	if is_hovering_pause:
+		draw_string(font, rect.position + Vector2(0, 60), "ESC", HORIZONTAL_ALIGNMENT_CENTER, 48, 12, Color(INK.r, INK.g, INK.b, 0.6))
+
+
+func _draw_wobbly_rect(rect: Rect2, color: Color, thickness: float, fill: bool = false, fill_color: Color = Color.TRANSPARENT) -> void:
+	if fill:
+		draw_rect(rect, fill_color)
+	
+	var p1 = rect.position
+	var p2 = Vector2(rect.end.x, rect.position.y)
+	var p3 = rect.end
+	var p4 = Vector2(rect.position.x, rect.end.y)
+	
+	var jitter = 1.0
+	var points = [p1, p2, p3, p4, p1]
+	for i in range(points.size() - 1):
+		var start = points[i]
+		var end = points[i+1]
+		var j_start = start + Vector2(randf_range(-jitter, jitter), randf_range(-jitter, jitter))
+		var j_end = end + Vector2(randf_range(-jitter, jitter), randf_range(-jitter, jitter))
+		draw_line(j_start, j_end, color, thickness)
 
 
 func _draw_shield_charges(font: Font) -> void:
@@ -109,8 +211,8 @@ func _draw_ink_meter(font: Font, viewport_size: Vector2) -> void:
 
 
 func _draw_wave_label(font: Font, viewport_size: Vector2) -> void:
-	draw_string(font, Vector2(viewport_size.x - 320.0, 31.0), wave_label, HORIZONTAL_ALIGNMENT_RIGHT, 290.0, 18, INK)
-	draw_string(font, Vector2(viewport_size.x - 320.0, 56.0), "Popped " + str(score), HORIZONTAL_ALIGNMENT_RIGHT, 290.0, 15, Color(0.07, 0.06, 0.05, 0.78))
+	draw_string(font, Vector2(viewport_size.x - 378.0, 31.0), wave_label, HORIZONTAL_ALIGNMENT_RIGHT, 290.0, 18, INK)
+	draw_string(font, Vector2(viewport_size.x - 378.0, 56.0), "Popped " + str(score), HORIZONTAL_ALIGNMENT_RIGHT, 290.0, 15, Color(0.07, 0.06, 0.05, 0.78))
 	if state_note != "":
 		draw_string(font, Vector2(viewport_size.x * 0.5 - 180.0, 71.0), state_note, HORIZONTAL_ALIGNMENT_CENTER, 360.0, 15, Color(0.07, 0.06, 0.05, 0.72))
 

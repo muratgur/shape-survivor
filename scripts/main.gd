@@ -168,6 +168,7 @@ func _create_scene_graph() -> void:
 	hud = HudScene.new()
 	hud.name = "HUD"
 	hud.set_anchors_preset(Control.PRESET_FULL_RECT)
+	hud.pause_clicked.connect(_pause_game)
 	ui_layer.add_child(hud)
 
 	upgrade_draft = UpgradeDraftScene.new()
@@ -184,6 +185,8 @@ func _create_scene_graph() -> void:
 	pause_overlay = PauseOverlayScene.new()
 	pause_overlay.name = "PauseOverlay"
 	pause_overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
+	pause_overlay.resume_requested.connect(_resume_game)
+	pause_overlay.quit_requested.connect(_on_pause_quit_requested)
 	ui_layer.add_child(pause_overlay)
 
 	shop = ShopScene.new()
@@ -1076,13 +1079,52 @@ func _finish_run(won: bool) -> void:
 func _pause_game() -> void:
 	previous_state = game_state
 	game_state = GameState.PAUSED
-	pause_overlay.visible = true
-	pause_overlay.queue_redraw()
+	pause_overlay.show_overlay()
 
 
 func _resume_game() -> void:
 	game_state = previous_state
-	pause_overlay.visible = false
+	pause_overlay.hide_overlay()
+
+
+func _on_pause_quit_requested() -> void:
+	_reset_run_state()
+	_show_character_select()
+
+
+func _reset_run_state() -> void:
+	_clear_all_runtime_nodes()
+	ink_this_wave = 0
+	ink_total = 0
+	ink_bank = 0
+	score = 0
+	enemies_popped = 0
+	upgrades_chosen = 0
+	waves_cleared = 0
+	survived_time = 0.0
+	current_wave_index = 0
+	
+	base_damage_multiplier = 1.0
+	side_bonus_per_extra_side = 0.0
+	temp_damage_mult = 1.0
+	shield_charges = 0
+	
+	speed_burst_timer = 0.0
+	speed_burst_base = 0.0
+	magnet_pulse_timer = 0.0
+	magnet_pulse_base = 0.0
+	damage_burst_timer = 0.0
+	
+	camera_shake_time = 0.0
+	camera_shake_duration = 0.0
+	camera.position = camera_base_position
+	
+	hud.visible = false
+	upgrade_draft.hide_draft()
+	shop.hide_shop()
+	result_screen.hide_result()
+	pause_overlay.hide_overlay()
+	player.visible = false
 
 
 func _on_player_died() -> void:
@@ -1325,7 +1367,8 @@ func _update_hud(note: String = "") -> void:
 		"state_note": note,
 		"shield_charges": shield_charges,
 		"difficulty_label": str(_current_difficulty_profile().get("label", "EASY")),
-		"difficulty_id": selected_difficulty_id
+		"difficulty_id": selected_difficulty_id,
+		"show_pause_button": game_state == GameState.COMBAT or game_state == GameState.SHOP
 	})
 
 
@@ -1624,6 +1667,7 @@ func _register_default_inputs() -> void:
 	_add_key("open_codex", KEY_C)
 	_add_joy_button("confirm", JOY_BUTTON_A)
 	_add_joy_button("pause_game", JOY_BUTTON_START)
+	_add_joy_button("pause_game", JOY_BUTTON_B)
 	_add_joy_button("move_left", JOY_BUTTON_DPAD_LEFT)
 	_add_joy_button("move_right", JOY_BUTTON_DPAD_RIGHT)
 	_add_joy_button("move_up", JOY_BUTTON_DPAD_UP)
