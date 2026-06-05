@@ -1464,7 +1464,7 @@ func _scaled_ink_drop_count(base_drop_rate: float) -> int:
 func _build_wave_data() -> void:
 	waves = [
 		{
-			"label": "Wave 1/7",
+			"label": "Wave 1/8",
 			"duration": 45.0,
 			"spawn_rate": 1.20,
 			"threshold": 18,
@@ -1472,7 +1472,7 @@ func _build_wave_data() -> void:
 			"mix": ["wobble_circle", "wobble_circle", "smug_square"]
 		},
 		{
-			"label": "Wave 2/7",
+			"label": "Wave 2/8",
 			"duration": 60.0,
 			"spawn_rate": 0.80,
 			"threshold": 30,
@@ -1480,7 +1480,7 @@ func _build_wave_data() -> void:
 			"mix": ["wobble_circle", "smug_square", "pointy_triangle", "pointy_triangle"]
 		},
 		{
-			"label": "Wave 3/7",
+			"label": "Wave 3/8",
 			"duration": 75.0,
 			"spawn_rate": 0.55,
 			"threshold": 42,
@@ -1488,7 +1488,7 @@ func _build_wave_data() -> void:
 			"mix": ["wobble_circle", "smug_square", "pointy_triangle", "needle_line", "needle_line", "dizzy_spiral"]
 		},
 		{
-			"label": "Wave 4/7: Contested Routes",
+			"label": "Wave 4/8: Contested Routes",
 			"duration": 65.0,
 			"spawn_rate": 0.60,
 			"threshold": 48,
@@ -1497,7 +1497,7 @@ func _build_wave_data() -> void:
 			"mix": ["wobble_circle", "needle_line", "needle_line", "dizzy_spiral", "dizzy_spiral", "pointy_triangle"]
 		},
 		{
-			"label": "Wave 5/7: Polygon Tremor",
+			"label": "Wave 5/8: Polygon Tremor",
 			"duration": 32.0,
 			"spawn_rate": 1.25,
 			"threshold": 0,
@@ -1508,7 +1508,17 @@ func _build_wave_data() -> void:
 			"mix": ["wobble_circle", "wobble_circle", "smug_square", "smug_square", "pointy_triangle", "needle_line"]
 		},
 		{
-			"label": "Wave 6/7: The Proof",
+			"label": "Wave 6/8: Draft Corridor",
+			"duration": 20.0,
+			"spawn_rate": 0.90,
+			"threshold": 0,
+			"has_shop": false,
+			"draft_after": true,
+			"draft_offers": ["apology_orb", "orbit_ruler", "volunteer_dot_plus"],
+			"mix": ["wobble_circle"]
+		},
+		{
+			"label": "Wave 7/8: The Proof",
 			"duration": 40.0,
 			"spawn_rate": 0.55,
 			"threshold": 0,
@@ -1519,7 +1529,7 @@ func _build_wave_data() -> void:
 			"mix": ["needle_line", "needle_line", "dizzy_spiral"]
 		},
 		{
-			"label": "Boss 7/7",
+			"label": "Boss 8/8",
 			"duration": 90.0,
 			"spawn_rate": 1.40,
 			"threshold": 42,
